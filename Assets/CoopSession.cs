@@ -29,13 +29,13 @@ internal sealed class CoopSession : MonoBehaviour
         public byte Id;
         public Vector2 Position;
         public uint LastSequence;
-        public byte Color;
+        public byte Appearance;
     }
 
     private sealed class Avatar
     {
         public GameObject Object;
-        public byte Color;
+        public byte Appearance;
     }
 
     private readonly Dictionary<NetworkConnection, Peer> peers = new Dictionary<NetworkConnection, Peer>();
@@ -49,7 +49,7 @@ internal sealed class CoopSession : MonoBehaviour
     private int operation;
     private float nextTick, connectionDeadline;
     private uint sequence, lastSnapshot;
-    private byte localId, localColor;
+    private byte localId, localAppearance;
 
     internal bool IsHost => driver.IsCreated && hosting;
     internal bool Active => busy || driver.IsCreated;
@@ -100,7 +100,7 @@ internal sealed class CoopSession : MonoBehaviour
     {
         int currentOperation = ++operation;
         busy = true;
-        localColor = (byte)CharacterProfiles.Active.Color;
+        localAppearance = (byte)CharacterProfiles.Active.Appearance;
         previousRunInBackground = Application.runInBackground;
         Application.runInBackground = true;
         Status = code == null ? "Creating Relay lobby..." : "Connecting through Relay...";
@@ -304,7 +304,7 @@ internal sealed class CoopSession : MonoBehaviour
         writer.WriteByte(PositionMessage);
         writer.WriteUInt(++sequence);
         WritePosition(ref writer, LocalPosition);
-        writer.WriteByte(localColor);
+        writer.WriteByte(localAppearance);
         driver.EndSend(writer);
     }
 
@@ -316,15 +316,15 @@ internal sealed class CoopSession : MonoBehaviour
 
         uint positionSequence = reader.ReadUInt();
         var position = ReadPosition(ref reader);
-        byte color = reader.ReadByte();
-        if (positionSequence <= peer.LastSequence || !Valid(position) || color >= CharacterProfiles.ColorCount)
+        byte appearance = reader.ReadByte();
+        if (positionSequence <= peer.LastSequence || !Valid(position) || appearance >= CharacterProfiles.AppearanceCount)
             return;
         peer.LastSequence = positionSequence;
-        peer.Color = color;
+        peer.Appearance = appearance;
         if (started)
             peer.Position = position;
         if (localBlock != null)
-            SetAvatar(peer.Id, position, color);
+            SetAvatar(peer.Id, position, appearance);
     }
 
     private void Broadcast()
@@ -339,9 +339,9 @@ internal sealed class CoopSession : MonoBehaviour
             writer.WriteByte(recipient.Value.Id);
             writer.WriteByte(started ? (byte)1 : (byte)0);
             writer.WriteByte((byte)Count);
-            WritePlayer(ref writer, 1, LocalPosition, localColor);
+            WritePlayer(ref writer, 1, LocalPosition, localAppearance);
             foreach (var peer in peers.Values)
-                WritePlayer(ref writer, peer.Id, peer.Position, peer.Color);
+                WritePlayer(ref writer, peer.Id, peer.Position, peer.Appearance);
             driver.EndSend(writer);
         }
     }
@@ -375,32 +375,43 @@ internal sealed class CoopSession : MonoBehaviour
         {
             byte id = reader.ReadByte();
             var position = ReadPosition(ref reader);
-            byte color = reader.ReadByte();
-            if (id < 1 || id > MaxPlayers || id == localId || !Valid(position) || color >= CharacterProfiles.ColorCount)
+            byte appearance = reader.ReadByte();
+            if (id < 1 || id > MaxPlayers || id == localId || !Valid(position) || appearance >= CharacterProfiles.AppearanceCount)
                 continue;
             present |= 1 << id;
-            SetAvatar(id, position, color);
+            SetAvatar(id, position, appearance);
         }
         for (byte id = 1; id <= MaxPlayers; id++)
             if ((present & (1 << id)) == 0)
                 RemoveAvatar(id);
     }
 
-    private void SetAvatar(byte id, Vector2 position, byte color)
+    private void SetAvatar(byte id, Vector2 position, byte appearance)
     {
+        bool created = false;
         if (!avatars.TryGetValue(id, out var avatar))
         {
             var character = new GameObject("Co-op Player " + id);
-            Instantiate(localBlock.Find("Character Visual"), character.transform, false);
-            avatar = new Avatar { Object = character, Color = byte.MaxValue };
+            var visual = Instantiate(localBlock.Find("Player_Character"), character.transform, false);
+            visual.localRotation = Quaternion.identity;
+            avatar = new Avatar { Object = character, Appearance = byte.MaxValue };
             avatars.Add(id, avatar);
+            created = true;
         }
-        if (avatar.Color != color)
+        if (avatar.Appearance != appearance)
         {
-            CharacterProfiles.ApplyTint(avatar.Object, CharacterProfiles.Tint(color));
-            avatar.Color = color;
+            CharacterProfiles.ApplyAppearance(avatar.Object, CharacterProfile.FromAppearance("", appearance));
+            avatar.Appearance = appearance;
         }
-        avatar.Object.transform.position = new Vector3(position.x, localBlock.position.y, position.y);
+        var nextPosition = new Vector3(position.x, localBlock.position.y, position.y);
+        var delta = nextPosition - avatar.Object.transform.position;
+        bool moving = !created && delta.sqrMagnitude > 0.000001f && delta.sqrMagnitude < 25f;
+        avatar.Object.transform.position = nextPosition;
+        if (moving)
+            avatar.Object.transform.rotation = Quaternion.LookRotation(delta);
+        var animator = avatar.Object.GetComponentInChildren<Animator>();
+        if (animator != null)
+            animator.SetBool("IsMoving", moving);
     }
 
     private void RemoveAvatar(byte id)
@@ -411,11 +422,11 @@ internal sealed class CoopSession : MonoBehaviour
         avatars.Remove(id);
     }
 
-    private static void WritePlayer(ref DataStreamWriter writer, byte id, Vector2 position, byte color)
+    private static void WritePlayer(ref DataStreamWriter writer, byte id, Vector2 position, byte appearance)
     {
         writer.WriteByte(id);
         WritePosition(ref writer, position);
-        writer.WriteByte(color);
+        writer.WriteByte(appearance);
     }
 
     private static void WritePosition(ref DataStreamWriter writer, Vector2 position)

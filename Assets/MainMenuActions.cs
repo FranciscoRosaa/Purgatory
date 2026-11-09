@@ -25,7 +25,19 @@ internal static class MainMenuActions
             if (CharacterProfiles.HasSlot(CharacterProfiles.ActiveSlot))
             {
                 var character = GameObject.Find("Personagem");
-                CharacterProfiles.ApplyTint(character, CharacterProfiles.Tint(CharacterProfiles.Active.Color));
+                CharacterProfiles.ApplyAppearance(character, CharacterProfiles.Active);
+            }
+            var player = GameObject.Find("Personagem");
+            if (player != null)
+            {
+                var appearance = player.GetComponentInChildren<CharacterAppearance>();
+                if (appearance != null)
+                {
+                    var grounding = appearance.GetComponent<MenuCharacterGrounding>();
+                    if (grounding == null) grounding = appearance.gameObject.AddComponent<MenuCharacterGrounding>();
+                    grounding.body = appearance.body;
+                    grounding.followParentHeight = true;
+                }
             }
             return;
         }
@@ -69,7 +81,7 @@ internal static class MainMenuActions
 
         void PreviewCharacter(CharacterProfile profile)
         {
-            CharacterProfiles.ApplyTint(preview, CharacterProfiles.Tint(profile.Color));
+            CharacterProfiles.ApplyAppearance(preview, profile);
             menuName.text = lobbyName.text = profile.Name;
         }
 
@@ -80,7 +92,7 @@ internal static class MainMenuActions
                 PreviewCharacter(CharacterProfiles.Active);
                 return;
             }
-            CharacterProfiles.ApplyTint(preview, CharacterProfiles.Tint(0));
+            CharacterProfiles.ApplyAppearance(preview, new CharacterProfile("Character"));
             menuName.text = initialMenuName;
             lobbyName.text = initialLobbyName;
         }
@@ -97,7 +109,7 @@ internal static class MainMenuActions
             EventSystem.current?.SetSelectedGameObject(solo.gameObject);
         }
 
-        customizer.Setup(PreviewCharacter, ShowModes);
+        customizer.Setup(PreviewCharacter, ShowMainMenu);
 
         void ShowMainMenu()
         {
@@ -106,37 +118,38 @@ internal static class MainMenuActions
             picker.SetActive(false);
             customization.SetActive(false);
             actions.SetActive(true);
+            RestorePreview();
             preview.transform.position = menuPosition;
             camera.backgroundColor = menuBackground;
             EventSystem.current?.SetSelectedGameObject(play.gameObject);
         }
 
-        void Customize(string label, System.Action next)
+        void Customize()
         {
+            actions.SetActive(false);
             picker.SetActive(false);
-            customizer.Open(label, next);
+            customizer.Open("Save & return", ShowMainMenu);
         }
 
         play.onClick.AddListener(ShowModes);
-        solo.onClick.AddListener(() => Customize("Start Solo", () =>
-            SceneManager.LoadScene(GameScene, LoadSceneMode.Single)));
+        actions.transform.Find("Character").GetComponent<Button>().onClick.AddListener(Customize);
+        solo.onClick.AddListener(() => SceneManager.LoadScene(GameScene, LoadSceneMode.Single));
         picker.transform.Find("Back").GetComponent<Button>().onClick.AddListener(ShowMainMenu);
         void ShowLobby()
         {
             customization.SetActive(false);
             layout.gameObject.SetActive(false);
             lobby.SetActive(true);
-            preview.transform.position = new Vector3(4.7f, 0f, menuPosition.z);
-            camera.backgroundColor = new Color32(15, 23, 39, 255);
+            preview.transform.position = menuPosition;
+            camera.backgroundColor = menuBackground;
             EventSystem.current?.SetSelectedGameObject(lobby.transform.Find("Roster/Host Button").gameObject);
         }
 
-        picker.transform.Find("Play With Friends").GetComponent<Button>().onClick.AddListener(() =>
-            Customize("Continue to Lobby", ShowLobby));
+        picker.transform.Find("Play With Friends").GetComponent<Button>().onClick.AddListener(ShowLobby);
         leave.onClick.AddListener(() => { session.Stop(); ShowMainMenu(); });
         actions.transform.Find("Exit").GetComponent<Button>().onClick.AddListener(Exit);
 
-        var intro = canvas.transform.Find("Active Creators Intro").gameObject;
+        var intro = System.Array.Find(scene.GetRootGameObjects(), root => root.name == "Active Creators Intro");
         intro.SetActive(showIntro);
         if (showIntro)
         {
@@ -155,10 +168,14 @@ internal static class MainMenuActions
             yield return null;
 #endif
         yield return new WaitForSecondsRealtime(1.5f);
+        if (intro == null || menu == null)
+            yield break;
         const float fadeDuration = 0.85f;
         float start = Time.unscaledTime;
         while (Time.unscaledTime - start < fadeDuration)
         {
+            if (intro == null || menu == null)
+                yield break;
             intro.alpha = 1f - Mathf.SmoothStep(0f, 1f, (Time.unscaledTime - start) / fadeDuration);
             yield return null;
         }

@@ -11,10 +11,37 @@ public sealed class WasdBlockMovement : MonoBehaviour
     [SerializeField, Min(0.01f)] private float dashDuration = 0.15f;
     [SerializeField, Min(0f)] private float dashCooldown = 0.55f;
     [SerializeField] private Collider[] walkableGround;
+    [SerializeField, Min(0.01f)] private float turnSharpness = 12f;
 
     private Vector3 dashDirection;
     private float dashTimeLeft;
     private float nextDashTime;
+
+    private Transform characterVisual;
+    private Quaternion targetRotation;
+    private Animator characterAnimator;
+    private Vector3 previousPosition;
+
+    private void Awake()
+    {
+        characterVisual = transform.Find("Player_Character");
+        targetRotation = characterVisual != null ? characterVisual.rotation : Quaternion.identity;
+        characterAnimator = characterVisual != null ? characterVisual.GetComponent<Animator>() : null;
+        previousPosition = transform.position;
+    }
+
+    private void LateUpdate()
+    {
+        if (characterVisual == null)
+            return;
+
+        float blend = 1f - Mathf.Exp(-turnSharpness * Time.deltaTime);
+        characterVisual.rotation = Quaternion.Slerp(characterVisual.rotation, targetRotation, blend);
+
+        if (characterAnimator != null)
+            characterAnimator.SetBool("IsMoving", (transform.position - previousPosition).sqrMagnitude > 0.000001f);
+        previousPosition = transform.position;
+    }
 
     private void Update()
     {
@@ -87,6 +114,9 @@ public sealed class WasdBlockMovement : MonoBehaviour
 
     private bool TryMove(Vector3 offset)
     {
+        if (characterVisual != null && offset.sqrMagnitude > 0f)
+            targetRotation = Quaternion.LookRotation(offset, Vector3.up);
+
         Vector3 nextPosition = transform.position + offset;
         if (!IsWalkable(nextPosition))
             return false;
