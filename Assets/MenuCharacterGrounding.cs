@@ -9,9 +9,16 @@ public sealed class MenuCharacterGrounding : MonoBehaviour
     public bool followParentHeight;
     private Mesh baked;
     private CharacterAppearance appearance;
+    private WasdBlockMovement movement;
     private readonly List<Vector3> vertices = new List<Vector3>();
 
-    private void LateUpdate() => SnapToGround();
+    private void Awake() => movement = GetComponentInParent<WasdBlockMovement>();
+
+    private void LateUpdate()
+    {
+        if (movement == null || !movement.UsesDashGrounding)
+            SnapToGround();
+    }
 
     public void SnapToGround()
     {
