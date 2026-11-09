@@ -508,6 +508,7 @@ GameObject:
   - component: {fileID: 143731338}
   - component: {fileID: 143731336}
   - component: {fileID: 143731339}
+  - component: {fileID: 143731340}
   m_Layer: 0
   m_Name: Personagem
   m_TagString: Untagged
@@ -574,6 +575,20 @@ MonoBehaviour:
   - {fileID: 2086150559}
   turnSharpness: 12
   dashWindMaterial: {fileID: 2100000, guid: 0fe101b940a838146a32a60a51a029a0, type: 2}
+--- !u!114 &143731340
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 143731334}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 27bd03aa2aa615244867866b5264bbac, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::PlayerMeleeCombo
+  comboWindow: 0.8
+  finisherCooldown: 0.65
 --- !u!1001 &150332075
 PrefabInstance:
   m_ObjectHideFlags: 0
