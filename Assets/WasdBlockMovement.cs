@@ -29,6 +29,7 @@ public sealed class WasdBlockMovement : MonoBehaviour
 
     internal bool UsesDashGrounding { get; private set; }
     internal bool IsDodging => dashTimeLeft > 0f || dashedThisFrame || UsesDashGrounding;
+    internal Material WindMaterial => dashWindMaterial;
 
     private void Awake()
     {
