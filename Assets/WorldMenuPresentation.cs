@@ -14,7 +14,6 @@ public sealed class WorldMenuPresentation : MonoBehaviour
         public RectTransform Rect;
         public Vector3 Position;
         public CanvasGroup Group;
-        public float Hover;
         public int Order;
     }
 
@@ -94,6 +93,11 @@ public sealed class WorldMenuPresentation : MonoBehaviour
         settings.Find("Volume Minus").GetComponent<Button>().onClick.AddListener(() => ChangeVolume(-0.1f));
         settings.Find("Volume Plus").GetComponent<Button>().onClick.AddListener(() => ChangeVolume(0.1f));
         settings.Find("Motion").GetComponent<Button>().onClick.AddListener(ToggleMotion);
+        settings.Find("Camera Shake").GetComponent<Button>().onClick.AddListener(() =>
+        {
+            GameplayHud.CameraShakeEnabled = !GameplayHud.CameraShakeEnabled;
+            RefreshSettings();
+        });
         settings.Find("Fullscreen").GetComponent<Button>().onClick.AddListener(() =>
         {
             Screen.fullScreen = !Screen.fullScreen;
@@ -139,6 +143,7 @@ public sealed class WorldMenuPresentation : MonoBehaviour
     {
         settings.Find("Volume Value").GetComponent<Text>().text = Mathf.RoundToInt(AudioListener.volume * 100f) + "%";
         settings.Find("Motion/Label").GetComponent<Text>().text = "REDUCED MOTION     " + (reducedMotion ? "ON" : "OFF");
+        settings.Find("Camera Shake/Label").GetComponent<Text>().text = "CAMERA SHAKE     " + (GameplayHud.CameraShakeEnabled ? "ON" : "OFF");
         settings.Find("Fullscreen/Label").GetComponent<Text>().text = "FULLSCREEN     " + (Screen.fullScreen ? "ON" : "OFF");
     }
 
@@ -207,16 +212,11 @@ public sealed class WorldMenuPresentation : MonoBehaviour
         foreach (var item in buttons)
         {
             if (item.Rect == null || !item.Button.gameObject.activeInHierarchy) continue;
-            bool selected = EventSystem.current != null && EventSystem.current.currentSelectedGameObject == item.Button.gameObject;
-            bool hovered = !covered && RectTransformUtility.RectangleContainsScreenPoint(item.Rect, pointer, menuCamera);
-            float hover = item.Button.interactable && (selected || hovered) ? 1f : 0f;
-            item.Hover = reducedMotion ? hover : Mathf.Lerp(item.Hover, hover, 1f - Mathf.Exp(-15f * dt));
             bool main = item.Button.transform.parent == actions;
             float reveal = reducedMotion || !main ? 1f : Mathf.Clamp01((age - item.Order * 0.075f) / 0.45f);
             float ease = 1f - Mathf.Pow(1f - reveal, 3f);
             item.Group.alpha = ease;
-            item.Rect.localPosition = item.Position + new Vector3((1f - ease) * 55f + item.Hover * 8f, 0, item.Hover * -15f);
-            item.Rect.localScale = Vector3.one * (1f + item.Hover * 0.025f);
+            item.Rect.localPosition = item.Position + Vector3.right * ((1f - ease) * 55f);
         }
     }
 

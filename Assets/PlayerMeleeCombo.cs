@@ -9,12 +9,14 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(WasdBlockMovement))]
 public sealed class PlayerMeleeCombo : MonoBehaviour
 {
+    internal const int StrikeCount = 3;
+    internal const float DefaultAttackCooldown = 1.25f;
+
     private static readonly int[] StrikeStates =
     {
         Animator.StringToHash("Base Layer.Sword_Light_A"),
         Animator.StringToHash("Base Layer.Sword_Light_B"),
-        Animator.StringToHash("Base Layer.Sword_Light_C"),
-        Animator.StringToHash("Base Layer.Sword_Light_D")
+        Animator.StringToHash("Base Layer.Sword_Light_C")
     };
 
     private static readonly int[] RecoveryStates =
@@ -24,27 +26,39 @@ public sealed class PlayerMeleeCombo : MonoBehaviour
         Animator.StringToHash("Base Layer.Sword_Light_C_Rec")
     };
 
-    // Swing windows and impact frames in normalized clip time.
-    private static readonly (float Start, float Impact, float End)[] SwingTiming =
+    [System.Serializable]
+    private struct SwingWindow
     {
-        (0.28f, 0.55f, 0.86f),
-        (0.28f, 0.54f, 0.83f),
-        (0.36f, 0.54f, 0.76f),
-        (0.07f, 0.16f, 0.32f)
-    };
+        [Range(0f, 1f)] public float Start;
+        [Range(0f, 1f)] public float Impact;
+        [Range(0f, 1f)] public float End;
 
-    [SerializeField, Min(0f)] private float finisherCooldown = 0.65f;
+        internal SwingWindow(float start, float impact, float end)
+        {
+            Start = start;
+            Impact = impact;
+            End = end;
+        }
+    }
+
+    [SerializeField, Min(0f), Tooltip("Seconds between the starts of consecutive M1 attacks.")]
+    private float attackCooldown = DefaultAttackCooldown;
+    [Header("Swing timing (normalized clip time)")]
+    [SerializeField] private SwingWindow swingA = new SwingWindow(0.28f, 0.55f, 0.86f);
+    [SerializeField] private SwingWindow swingB = new SwingWindow(0.28f, 0.54f, 0.83f);
+    [SerializeField] private SwingWindow swingC = new SwingWindow(0.36f, 0.54f, 0.76f);
 
     private WasdBlockMovement movement;
     private Animator animator;
-    private Transform head;
-    private Quaternion headFacingForward;
-    private KatanaHandGrip katanaGrip;
     private MeleeSlashPresentation presentation;
+    private LungeMan enemy;
     private int strike = -1;
-    private bool queued;
+    private int nextStrike;
     private bool recovering;
+    private bool damageApplied;
     private float nextAllowedAttack;
+
+    internal float AttackCooldown => Mathf.Max(0f, attackCooldown);
 
     private void Awake()
     {
@@ -53,22 +67,14 @@ public sealed class PlayerMeleeCombo : MonoBehaviour
         enabled = animator != null
             && System.Array.TrueForAll(StrikeStates, state => animator.HasState(0, state))
             && System.Array.TrueForAll(RecoveryStates, state => animator.HasState(0, state));
+        if (!enabled)
+            return;
 
-        if (enabled)
-        {
-            if (animator.isHuman)
-            {
-                head = animator.GetBoneTransform(HumanBodyBones.Head);
-                if (head != null)
-                    headFacingForward = Quaternion.Inverse(animator.transform.rotation) * head.rotation;
-            }
-
-            katanaGrip = GetComponentInChildren<KatanaHandGrip>(true);
-            var blade = katanaGrip?.BladeModel;
-            var mesh = blade != null ? blade.GetComponent<MeshFilter>()?.sharedMesh : null;
-            if (mesh != null && movement.WindMaterial != null)
-                presentation = new MeleeSlashPresentation(blade, mesh, transform, movement.WindMaterial);
-        }
+        enemy = FindAnyObjectByType<LungeMan>();
+        var blade = GetComponentInChildren<KatanaHandGrip>(true)?.BladeModel;
+        var mesh = blade != null ? blade.GetComponent<MeshFilter>()?.sharedMesh : null;
+        if (mesh != null && movement.WindMaterial != null)
+            presentation = new MeleeSlashPresentation(blade, mesh, transform, movement.WindMaterial);
     }
 
     private void Update()
@@ -92,42 +98,17 @@ public sealed class PlayerMeleeCombo : MonoBehaviour
         }
 
         var state = animator.GetCurrentAnimatorStateInfo(0);
-        var timing = SwingTiming[strike];
+        var timing = strike == 0 ? swingA : strike == 1 ? swingB : swingC;
         bool isSwinging = state.fullPathHash == StrikeStates[strike];
         float time = state.normalizedTime;
-        if (isSwinging && strike == StrikeStates.Length - 1)
+        bool impact = isSwinging && time >= timing.Impact;
+        if (impact && !damageApplied)
         {
-            AimFinisherBlade(time);
-            AimFinisherHead(time);
+            damageApplied = true;
+            enemy?.ReceivePlayerStrike(transform.position, animator.transform.forward, strike);
         }
 
-        presentation?.Update(isSwinging && time >= timing.Start && time <= timing.End,
-            isSwinging && time >= timing.Impact);
-    }
-
-    private void AimFinisherHead(float time)
-    {
-        if (head == null)
-            return;
-
-        // Use the avatar's forward-facing head pose without moving the neck or torso.
-        float weight = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0f, 0.08f, time));
-        var facing = animator.transform.rotation * headFacingForward;
-        head.rotation = Quaternion.Slerp(head.rotation, facing, weight);
-    }
-
-    private void AimFinisherBlade(float time)
-    {
-        float aimIn = Mathf.SmoothStep(0f, 1f, Mathf.InverseLerp(0.03f, 0.11f, time));
-        float aimOut = Mathf.SmoothStep(1f, 0f, Mathf.InverseLerp(0.29f, 0.43f, time));
-        float weight = aimIn * aimOut;
-        if (weight <= 0f)
-            return;
-
-        // Sweep across the player's front, pointing straight ahead at impact.
-        float yaw = Mathf.Lerp(55f, -55f, Mathf.InverseLerp(0.06f, 0.26f, time));
-        var direction = Quaternion.AngleAxis(yaw, Vector3.up) * animator.transform.forward;
-        katanaGrip?.AimBlade(direction, weight);
+        presentation?.Update(isSwinging && time >= timing.Start && time <= timing.End, impact);
     }
 
     private void OnDisable() => presentation?.Clear();
@@ -136,62 +117,50 @@ public sealed class PlayerMeleeCombo : MonoBehaviour
 
     private void TickCombo(bool pressed, float now)
     {
-        bool finisher = strike == StrikeStates.Length - 1;
         if (movement.IsDodging)
         {
-            EndCombo(now, finisher);
+            EndStrike();
             return;
         }
 
-        if (strike < 0)
+        if (pressed && now >= nextAllowedAttack && (strike < 0 || recovering || damageApplied))
         {
-            if (pressed && now >= nextAllowedAttack)
-                PlayStrike(0);
+            PlayStrike(now);
             return;
         }
+        if (strike < 0)
+            return;
 
         var state = animator.GetCurrentAnimatorStateInfo(0);
-        if (recovering || finisher)
+        int expected = recovering ? RecoveryStates[strike] : StrikeStates[strike];
+        if (state.fullPathHash != expected)
         {
-            int endingState = recovering ? RecoveryStates[strike] : StrikeStates[strike];
-            if (state.fullPathHash != endingState)
-                EndCombo(now, finisher);
+            EndStrike();
             return;
         }
 
-        if (state.normalizedTime < 1f)
-        {
-            queued |= pressed;
-            return;
-        }
-
-        // Follow the authored recovery when no continuation was queued during the strike.
-        if (queued)
-        {
-            PlayStrike(strike + 1);
-        }
-        else
+        if (!recovering && state.normalizedTime >= 1f)
         {
             recovering = true;
             animator.Play(RecoveryStates[strike], 0, 0f);
         }
     }
 
-    private void PlayStrike(int index)
+    private void PlayStrike(float now)
     {
-        strike = index;
-        queued = false;
-        animator.Play(StrikeStates[index], 0, 0f);
-        presentation?.Begin(index == StrikeStates.Length - 1);
+        strike = nextStrike;
+        nextStrike = (nextStrike + 1) % StrikeCount;
+        nextAllowedAttack = now + AttackCooldown;
+        recovering = false;
+        damageApplied = false;
+        animator.Play(StrikeStates[strike], 0, 0f);
+        movement.FlashMelee();
+        presentation?.Begin(strike == StrikeCount - 1);
     }
 
-    private void EndCombo(float now, bool finisher)
+    private void EndStrike()
     {
-        if (finisher)
-            nextAllowedAttack = now + finisherCooldown;
-
         strike = -1;
-        queued = false;
         recovering = false;
     }
 }

@@ -4,19 +4,13 @@ using UnityEngine.Rendering;
 
 internal sealed class DashPresentation
 {
-    private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
-    private static readonly int BaseMap = Shader.PropertyToID("_BaseMap");
-
     private readonly Transform visual;
     private readonly SkinnedMeshRenderer[] skins;
-    private readonly Renderer[] renderers;
-    private readonly MaterialPropertyBlock[] originalAppearance;
-    private readonly MaterialPropertyBlock whiteAppearance = new MaterialPropertyBlock();
+    private readonly CharacterWhiteFlash flash;
     private readonly Mesh pose = new Mesh { name = "Dash ground probe" };
     private readonly List<Vector3> vertices = new List<Vector3>();
     private readonly ParticleSystem wind;
     private Vector3 lastWindPosition;
-    private bool flashing;
     private Vector3 uncorrectedPosition;
     private Vector3 correctedPosition;
     private bool lifted;
@@ -25,10 +19,7 @@ internal sealed class DashPresentation
     {
         this.visual = visual;
         skins = visual.GetComponentsInChildren<SkinnedMeshRenderer>(true);
-        renderers = visual.GetComponentsInChildren<Renderer>(true);
-        originalAppearance = new MaterialPropertyBlock[renderers.Length];
-        for (int i = 0; i < renderers.Length; i++)
-            originalAppearance[i] = new MaterialPropertyBlock();
+        flash = new CharacterWhiteFlash(visual);
 
         if (windMaterial != null)
             wind = CreateWind(player, windMaterial);
@@ -36,7 +27,7 @@ internal sealed class DashPresentation
 
     internal void Begin(Vector3 position, Vector3 direction)
     {
-        SetFlash(true);
+        flash.Update(true);
         lastWindPosition = position;
         EmitWind(position, direction, 8);
     }
@@ -56,7 +47,7 @@ internal sealed class DashPresentation
             }
         }
 
-        SetFlash(dashing);
+        flash.Update(dashing);
         if (dashing && (position - lastWindPosition).sqrMagnitude >= 0.36f)
         {
             EmitWind(position, direction, 4);
@@ -89,36 +80,11 @@ internal sealed class DashPresentation
         return lowest;
     }
 
-    private void SetFlash(bool active)
+    internal void FlashMelee() => flash.Pulse();
+
+    internal static ParticleSystem CreateWind(Transform parent, Material material, string name = "Dash Wind")
     {
-        if (active == flashing)
-            return;
-
-        flashing = active;
-        for (int i = 0; i < renderers.Length; i++)
-        {
-            var renderer = renderers[i];
-            if (renderer == null)
-                continue;
-
-            if (active)
-            {
-                renderer.GetPropertyBlock(originalAppearance[i]);
-                renderer.GetPropertyBlock(whiteAppearance);
-                whiteAppearance.SetColor(BaseColor, new Color(1.75f, 1.75f, 1.75f, 1f));
-                whiteAppearance.SetTexture(BaseMap, Texture2D.whiteTexture);
-                renderer.SetPropertyBlock(whiteAppearance);
-            }
-            else
-            {
-                renderer.SetPropertyBlock(originalAppearance[i]);
-            }
-        }
-    }
-
-    private static ParticleSystem CreateWind(Transform parent, Material material)
-    {
-        var effect = new GameObject("Dash Wind");
+        var effect = new GameObject(name);
         effect.transform.SetParent(parent, false);
         var particles = effect.AddComponent<ParticleSystem>();
         particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -178,7 +144,7 @@ internal sealed class DashPresentation
 
     internal void Reset()
     {
-        SetFlash(false);
+        flash.Reset();
         ClearGroundLift();
         if (wind != null)
             wind.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
@@ -189,5 +155,66 @@ internal sealed class DashPresentation
         Object.Destroy(pose);
         if (wind != null)
             Object.Destroy(wind.gameObject);
+    }
+}
+
+internal sealed class CharacterWhiteFlash
+{
+    private static readonly int BaseColor = Shader.PropertyToID("_BaseColor");
+    private static readonly int BaseMap = Shader.PropertyToID("_BaseMap");
+    private const float PulseDuration = 0.09f;
+
+    private readonly Renderer[] renderers;
+    private readonly MaterialPropertyBlock[] original;
+    private readonly MaterialPropertyBlock white = new MaterialPropertyBlock();
+    private float pulseUntil;
+
+    internal bool Active { get; private set; }
+
+    internal CharacterWhiteFlash(Transform visual)
+    {
+        renderers = visual.GetComponentsInChildren<Renderer>(true);
+        original = new MaterialPropertyBlock[renderers.Length];
+        for (int i = 0; i < original.Length; i++)
+            original[i] = new MaterialPropertyBlock();
+    }
+
+    internal void Pulse()
+    {
+        pulseUntil = Time.time + PulseDuration;
+        SetWhite(true);
+    }
+
+    internal void Update(bool sustained = false) => SetWhite(sustained || Time.time < pulseUntil);
+
+    internal void Reset()
+    {
+        pulseUntil = 0f;
+        SetWhite(false);
+    }
+
+    private void SetWhite(bool active)
+    {
+        if (active == Active)
+            return;
+
+        Active = active;
+        for (int i = 0; i < renderers.Length; i++)
+        {
+            var renderer = renderers[i];
+            if (renderer == null)
+                continue;
+            if (!active)
+            {
+                renderer.SetPropertyBlock(original[i]);
+                continue;
+            }
+
+            renderer.GetPropertyBlock(original[i]);
+            renderer.GetPropertyBlock(white);
+            white.SetColor(BaseColor, new Color(1.75f, 1.75f, 1.75f, 1f));
+            white.SetTexture(BaseMap, Texture2D.whiteTexture);
+            renderer.SetPropertyBlock(white);
+        }
     }
 }

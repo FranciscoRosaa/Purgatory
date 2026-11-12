@@ -1,221 +1,353 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
     "2d-pixel-perfect": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/2d-pixel-perfect/SKILL.md",
-      "computedHash": "8e03347fd788af452856b8dd90fb3272f7667d0c47c81522f77036720e2d0666"
+      "computedHash": "675620bb5499c789193dccbe11045139dbc2f77d502eba4ffdd306ff41a36d70"
     },
     "asset-transformer-toolkit": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/asset-transformer-toolkit/SKILL.md",
-      "computedHash": "a2bbc0f8eb677ed71489e41e5b822df2d57bcd529987d288298e92c44028a969"
+      "computedHash": "140256edeecf26219ae258f97264f3de45dacc99712f7dfdb79f62f93213a828"
     },
     "audio-setup-mixers": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/audio-setup-mixers/SKILL.md",
-      "computedHash": "73876f5faf109b0e76923c42904ba10403a4efbbfaf99ade89eff224bb706e48"
+      "computedHash": "856c75c72e6dbb8864aecaeeb5b482547c18b881b554f59ac0414ab384c6f60f"
     },
     "build-gtk": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/build-gtk/SKILL.md",
-      "computedHash": "aa01e9c6306190c9d7ef4257c5f2571c709fb2dddeb0e716c93cea8ae9daf12f"
+      "computedHash": "6447371aad3a489bc3059282aace844486477689b7c065308efe1f0b94325f95"
     },
     "build-live-game": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/build-live-game/SKILL.md",
-      "computedHash": "6399228acc47bb1b74f667caabef288edc6a61e503a7702a5a497f1ea85b1f2a"
+      "computedHash": "29fcc3c4a8204497b8c9a92dfc5922f4c29b99bdaa1a9ebb17eee0558594febb"
+    },
+    "cavecrew": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/cavecrew/SKILL.md",
+      "computedHash": "e851caf8480d3ddf5de7fe490cbb2cda8840df760b3851510a24d605147d29e2"
+    },
+    "caveman": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman/SKILL.md",
+      "computedHash": "b51af74aacdadbc3c2d6bb79f05db58dc521854b87f7ffabd48faf286a81ed31"
+    },
+    "caveman-commit": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-commit/SKILL.md",
+      "computedHash": "2c1472fb59eedd3cfba0b6512dc470a00287343ade421db55c21a6fb52afbe86"
+    },
+    "caveman-compress": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-compress/SKILL.md",
+      "computedHash": "6b12806f8e4b84b79b360dfe5eba92647e7134e15484e7532efd3d4999dda89c"
+    },
+    "caveman-discover": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-discover/SKILL.md",
+      "computedHash": "6f0f9bc37b6c5c8c7944a57f6e671ff3b6e58a9ca7ef1557a93b19645a5f1191"
+    },
+    "caveman-evidence-review": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-evidence-review/SKILL.md",
+      "computedHash": "cd258392c713b9cf77d2dd92f1a407a7dccaa54ced28c92192e67d76a0cfe9c6"
+    },
+    "caveman-explore": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-explore/SKILL.md",
+      "computedHash": "b508768e6afc649bf828ea3d68df66740fa238c869f8bb87083081b9ead18b85"
+    },
+    "caveman-help": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-help/SKILL.md",
+      "computedHash": "6a3e3d37fa03b4aa0622a6aec14446a243619c1539ad419e065dc8b1cd70aacd"
+    },
+    "caveman-learn": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-learn/SKILL.md",
+      "computedHash": "bd8f0bedab21b580cddee401846aa81723378334548f41863fc131c58d612556"
+    },
+    "caveman-manage": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-manage/SKILL.md",
+      "computedHash": "2dd0ef43e4a5412913967513a494c2db2219fa34630378730409205f3a0b883a"
+    },
+    "caveman-optimize": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-optimize/SKILL.md",
+      "computedHash": "dc5eb46a2918c7250a069b1bcda3c5f385715801d42c317c251ba5208ccd685e"
+    },
+    "caveman-review": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-review/SKILL.md",
+      "computedHash": "c55908f8ee0dca0e59690e939dfd4a877bd9361897ae5fced096274a77509154"
+    },
+    "caveman-setup": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-setup/SKILL.md",
+      "computedHash": "e0fe84073dee9da687de4b1fc27a5bd06601c2bfb9bcb71121e60e55f32ac7e4"
+    },
+    "caveman-stats": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/caveman-stats/SKILL.md",
+      "computedHash": "d47db80af9353f411b5840fa207ac10c883f04576cd280b135e3a44a0ff86285"
     },
     "craft-game-floors": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/craft-game-floors/SKILL.md",
-      "computedHash": "8f47b25ad2c1292ff8ed567b875436c8cea869de098064fdec5c2a866c6250a7"
+      "computedHash": "9eed8a3feaa0a7a90a8e3bdd5db2207b661686c1b6d345541ef5f19259468425"
     },
     "create-2d-physics": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/create-2d-physics/SKILL.md",
-      "computedHash": "7fdaf0e4be1981c586ba9d8d5310179e31d634d9a142535072010edd20c254be"
+      "computedHash": "bcb13c95082f4dbd5bc028019d99b5ad3df7c8ae1432bd375d364d6bbbe25453"
     },
     "create-tile-palette-or-rule-tiles": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/create-tile-palette-or-rule-tiles/SKILL.md",
-      "computedHash": "44722dc363921895c6d3a6a47a24ca6dfbc6dd82859a419ef2f97b4642273f60"
+      "computedHash": "f5e18bd527dbd2849edef038abf50249699e8963d57d41a6416b3342dea42a5e"
     },
     "fix-3d-physics-collisions": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/fix-3d-physics-collisions/SKILL.md",
-      "computedHash": "698f3b40e456f81fb897e7498541fbafeed28587c553bb8e1d67f1f734cac538"
+      "computedHash": "5094b22676ecf6df9930d46cfadc91ab4d5857fd895ff56cd122203449461909"
     },
     "generate-editor-search-query": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/generate-editor-search-query/SKILL.md",
-      "computedHash": "fcee8843b33912f07780f4cb727f4a349f3543d13354da94ce79b4015e90082a"
+      "computedHash": "df54f2b196249fc7b7e1e44c0e867574c8dbb1c9bdb56fac1026aef38b83eb8b"
     },
     "implement-in-app-purchases": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/implement-in-app-purchases/SKILL.md",
-      "computedHash": "f8d65ee3697573660bfe79c40ecf2449c03fec1970a959f980ea42f04a6dfc2d"
+      "computedHash": "156e31fd49d116d6b0c9991e05e672ef94a930c1057c99adb9149943513f4e16"
     },
     "initialize-ai-navigation": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/initialize-ai-navigation/SKILL.md",
-      "computedHash": "75aa1c36d033f8dd86e0d0e2fe5aff241d43f8e9444402f174d5c0d016762b38"
+      "computedHash": "cd2d5d0eb677a61301014fd8e01575e78117feeb7e373c8951c33e00740ff64f"
+    },
+    "investigate-first": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/investigate-first/SKILL.md",
+      "computedHash": "129b1eba6d106c1d095baefd30578c6303b93119fcd21bd5583ebd34592f3acc"
+    },
+    "lean-build": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/lean-build/SKILL.md",
+      "computedHash": "aee8fbb86c5e1e5066089293423f71dd6a87ab37486c360cd4488ef2fe96c7a7"
     },
     "levelplay-unity-integration": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/levelplay-unity-integration/SKILL.md",
-      "computedHash": "596c8cfaa00270c33c310f3b76892ac13308c2d9501f700e780fb0cd015698ca"
+      "computedHash": "b84934e77967117994fda3d4a605c1a11769b2f0078b901a29219e28aadcbe7f"
     },
     "localize-unity-project": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/localize-unity-project/SKILL.md",
-      "computedHash": "2d82dceb887483a5ad884a3b01538bb79bcd2359ac99df92232458996fca8d88"
+      "computedHash": "1758f6cdd22571487dbb92bcd5ff0f28c643b3dcff58420ff3402088f618daac"
     },
     "manage-cloud-build": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/manage-cloud-build/SKILL.md",
-      "computedHash": "00f4045d84a93998afe15c4d6546607ea455ab07fc4134c961b145e209729582"
+      "computedHash": "767047ed728ac0d995b0c6585c417c60d4bcf43cbaa997743955caa5fa0070a6"
     },
     "manage-sprite-atlas": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/manage-sprite-atlas/SKILL.md",
-      "computedHash": "7c965f03e3450f85834a86ec5c638642655ae0b03b52cb1a1f602521ac84d4af"
+      "computedHash": "99a2b04d2bee394735954ff44493a799bdb2e8d9442c64d7de4299ef9861b043"
+    },
+    "megacave": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/megacave/SKILL.md",
+      "computedHash": "d38301dd11ffdbf9c876cb5a15ff245a31fe7806a29f7800e7fbe44fc306fd62"
     },
     "migrate-birp-to-urp": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/migrate-birp-to-urp/SKILL.md",
-      "computedHash": "abe7f0310ad2bf59c330ac108d1014124fcf0bfb5d080c13ad2e830c88435c0a"
+      "computedHash": "0eabf7f724d4d438615abef1ea6b2388e8dc820a5eba94a7618e6893405facb8"
+    },
+    "migration": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/migration/SKILL.md",
+      "computedHash": "e7c6efc84ff8f85d0242e7f29f51c09fd333c294cc3123ef8ee4b2aca2a93192"
     },
     "new-unity-project": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/new-unity-project/SKILL.md",
-      "computedHash": "457dd4312971fe9d4c6b849005d74f4f45d03b94014972203a9923643b70d9ae"
+      "computedHash": "4b99e424e8b9672326c16400d767fd58bfee673552f9f1b10ba58c266a792daa"
     },
     "optimize-audio": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/optimize-audio/SKILL.md",
-      "computedHash": "8ece8ae7356e002fc9230e095354ca4dee447862a6b1dc8d27980ad0016a27b4"
+      "computedHash": "f3b39b7083cf476e88c4a473e438d691c2d1a0f09376139cd2d96b0bc194033c"
     },
     "optimize-text-mesh-pro": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/optimize-text-mesh-pro/SKILL.md",
-      "computedHash": "b3a6f831dedabb4076d5a6d624a3b4de616facde793f49c2553ee301b5e99f43"
+      "computedHash": "2b65ac39538bcd7dd8cbfe523db7ac90e18a645251eda9f23e0e5add534c4322"
     },
     "optimize-web": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/optimize-web/SKILL.md",
-      "computedHash": "42c5a6b5589f6de3ecbeb9a1c9b854eef356550a693922523a784d7d97b0b1f4"
+      "computedHash": "2cdb638e915da29b151c2e2b75c990e43036c87623f2f04f43a9d1934478268a"
     },
     "project-auditor-fixes": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/project-auditor-fixes/SKILL.md",
-      "computedHash": "a76ac424edd27615520a30114f65cb394088dd4b76eb5643395f46a8368388b0"
+      "computedHash": "877c26dc6fe0a7706d070aa8b61292f10496d2f8fd6305c098b712cd492d4c9b"
+    },
+    "safe-refactor": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/safe-refactor/SKILL.md",
+      "computedHash": "709db1dfde3fe3baa362ecdb3f1f3c0be27587358242737dfa4ca82a23744269"
     },
     "setup-multiplayer-services": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/setup-multiplayer-services/SKILL.md",
-      "computedHash": "aee256db2d2196bf1471c5706db2086bae046cbe6f991ce5439d40dd2331a986"
+      "computedHash": "ee9a249d1060fd76a71b3f742ffdd59ec60ea615911c18ccb47eab7e9735ae3d"
     },
     "setup-vivox-voice-chat": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/setup-vivox-voice-chat/SKILL.md",
-      "computedHash": "a3fb70c2612ed882b4954ed5b2f7c96d4c70eb7cf5682c504824810f20a3a533"
+      "computedHash": "44f34821b923c2d48bff8ef19b192632ed480ea68629a24a5704f1ad2a24d1fd"
     },
     "shader-graph-create-custom-node": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/shader-graph-create-custom-node/SKILL.md",
-      "computedHash": "f12f1c46bebfe0dff9c5b42fe01537ac8da285e71180c37486922f96410f366b"
+      "computedHash": "8948a8a6149b7794e9e291bc322da0fab79bf8e32f15678c5cd4e301c153d903"
     },
     "sprite-editor": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/sprite-editor/SKILL.md",
-      "computedHash": "91a55fa93ed360f2ba8a3a6589fdc250b0fe4a45ba3a64e1fc3e2211b3130123"
+      "computedHash": "b3494b87bcda8462edb83b38a53fc6d8c50918ff2c262f347fb82d67b6aab699"
     },
     "sprite-segment-3x3grid": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/sprite-segment-3x3grid/SKILL.md",
-      "computedHash": "922afce2bd63dfcc2e8c0a75575b3495de8b5ed86a12decb853c01be9aa4792c"
+      "computedHash": "d48e14e9a98bbbcf338f2d33bb041b7cb19713e9e63dee2efd9e41a12728fd00"
+    },
+    "surgical-patch": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/surgical-patch/SKILL.md",
+      "computedHash": "5fa48d8d44e476bd633b0dc856b8342a715b5d5416b01778df5d6245b360c9df"
     },
     "ui": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/ui/SKILL.md",
-      "computedHash": "4019dcb930e8c9f5fb9b1e8f6b11e87bfd32d74cee64d1361cce6b10ee7b4be5"
+      "computedHash": "599e47774258e6b004814f3c85003f8543403177e1177a8a639d7956edc8734f"
     },
     "ui-imgui": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/ui-imgui/SKILL.md",
-      "computedHash": "8a90d3e7cef62a1af60558c90eb186e3f50f13bc746193ad6fa9757b6d969b28"
+      "computedHash": "2045b407b7e6cb545b93b30d91ae26286018054a8e5cd2e297552dfbe168be8f"
     },
     "ui-ugui": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/ui-ugui/SKILL.md",
-      "computedHash": "37a9cba38273613231d4df80aa4409ce49b4e2f7c39242019d398647651d4ff9"
+      "computedHash": "8ee643988bae2db0c69808c0cf790b819b23eb4ca68d159da3a01404e2f48240"
     },
     "ui-uitk": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/ui-uitk/SKILL.md",
-      "computedHash": "b1df693958fe56020afb89850371ec15bf5d9fb7ae242e0a323e7234a1d00240"
+      "computedHash": "a9c26e861971669598f0f302c04af7bbe39962c1749541f4da41cea2110ca0d2"
+    },
+    "ultracave": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/ultracave/SKILL.md",
+      "computedHash": "b9814ef35fbc9f4359f682c7f2e4944b30428f8c8d79463efa070f99fffaa453"
     },
     "unity-cli": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/unity-cli/SKILL.md",
-      "computedHash": "06c8ef72d46122bb7d0d24ed5cf820877667f8a98980bce519c3bd001a6bd028"
+      "computedHash": "edf7d5b2ad7f8b6f3d54e2ad45329c65523c53685cd59ae399c492249967c357"
     },
     "unity-package-management": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/unity-package-management/SKILL.md",
-      "computedHash": "09cc77995dd6e266145d6bd198c773b6e59fd6f0b8f554f87cc3661f55a45e89"
+      "computedHash": "1d70b6af639a3aefb1b3d8d6e9e09584a3bc59d103cee3df56b780f061604f8c"
     },
     "unity-pipeline": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/unity-pipeline/SKILL.md",
-      "computedHash": "5e026b161df73e3fa2ebd7e2486ab6171db13a8f416c80a625b4427f22a7fb17"
+      "computedHash": "2bd37e336acab3ab23bd6717999c2deb4727c6387f6a39b28b41ab6dff733022"
     },
     "urp-postprocessing": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/urp-postprocessing/SKILL.md",
-      "computedHash": "a1032fcd7985d13006ac4d0fd0532743fc198d9768113cc9f9f43222b72f43ca"
+      "computedHash": "bf849e4c701f5ac08e9c438e5a550c99be4a82b742c479076e986067ed9c8c2f"
     },
     "validate-urp-render-graph-renderer-feature": {
       "source": "Unity-Technologies/skills",
       "sourceType": "github",
       "skillPath": "skills/validate-urp-render-graph-renderer-feature/SKILL.md",
-      "computedHash": "6d40991d17b1be49c8b01114d6f20de0ee2122b09dbdb9a0b6ed0bce558663b9"
+      "computedHash": "ca7f8062e41f265733128dd194d316bde76c32ee4f23b93492746f08ccf85916"
+    },
+    "verify-and-stop": {
+      "source": "JuliusBrussee/caveman",
+      "sourceType": "github",
+      "skillPath": "skills/verify-and-stop/SKILL.md",
+      "computedHash": "130048a85c3d028f9e8bb9fa923143b11b55511c9c43ab3f155b6c8022e48f56"
     }
   }
 }

@@ -6,17 +6,22 @@ using UnityEngine.InputSystem;
 
 public sealed class WasdBlockMovement : MonoBehaviour
 {
+    internal const float PerfectDodgeWindow = 0.10f;
+
     [SerializeField, Min(0f)] private float speed = 5f;
     [SerializeField, Min(0.01f)] private float dashSpeed = 22f;
     [SerializeField, Min(0.01f)] private float dashDuration = 0.15f;
     [SerializeField, Min(0f)] private float dashCooldown = 0.55f;
     [SerializeField] private Collider[] walkableGround;
+    [SerializeField] private BoxCollider movementBoundary;
     [SerializeField, Min(0.01f)] private float turnSharpness = 12f;
     [SerializeField] private Material dashWindMaterial;
 
     private static readonly int RollState = Animator.StringToHash("Base Layer.Roll");
 
     private Vector3 dashDirection;
+    private Vector3 dashOrigin;
+    private float dashStartedAt;
     private float dashTimeLeft;
     private float nextDashTime;
     private bool dashedThisFrame;
@@ -30,6 +35,33 @@ public sealed class WasdBlockMovement : MonoBehaviour
     internal bool UsesDashGrounding { get; private set; }
     internal bool IsDodging => dashTimeLeft > 0f || dashedThisFrame || UsesDashGrounding;
     internal Material WindMaterial => dashWindMaterial;
+    internal byte MeleeFlashSequence { get; private set; }
+    internal float DashReach => dashSpeed * dashDuration;
+
+    internal Vector3 ClampToMovementBoundary(Vector3 position)
+    {
+        if (movementBoundary == null || !movementBoundary.enabled)
+            return position;
+
+        var sample = position;
+        sample.y = movementBoundary.bounds.center.y;
+        var constrained = movementBoundary.ClosestPoint(sample);
+        constrained.y = position.y;
+        return constrained;
+    }
+
+    internal void FlashMelee()
+    {
+        dashPresentation?.FlashMelee();
+        MeleeFlashSequence++;
+    }
+
+    internal bool TryGetDash(out Vector3 origin, out float age)
+    {
+        origin = dashOrigin;
+        age = Time.time - dashStartedAt;
+        return dashTimeLeft > 0f || dashedThisFrame;
+    }
 
     private void Awake()
     {
@@ -38,6 +70,7 @@ public sealed class WasdBlockMovement : MonoBehaviour
         characterAnimator = characterVisual != null ? characterVisual.GetComponent<Animator>() : null;
         if (characterVisual != null)
             dashPresentation = new DashPresentation(characterVisual, transform, dashWindMaterial);
+        transform.position = ClampToMovementBoundary(transform.position);
         previousPosition = transform.position;
     }
 
@@ -127,6 +160,8 @@ public sealed class WasdBlockMovement : MonoBehaviour
     private void BeginDash(Vector3 direction)
     {
         dashDirection = direction;
+        dashOrigin = transform.position;
+        dashStartedAt = Time.time;
         dashTimeLeft = dashDuration;
         nextDashTime = Time.time + dashDuration + dashCooldown;
         if (characterVisual != null)
@@ -164,10 +199,14 @@ public sealed class WasdBlockMovement : MonoBehaviour
         if (characterVisual != null && offset.sqrMagnitude > 0f)
             targetRotation = Quaternion.LookRotation(offset, Vector3.up);
 
-        Vector3 nextPosition = transform.position + offset;
-        if (!TryGetGroundHeight(nextPosition, out _))
+        Vector3 nextPosition = ClampToMovementBoundary(transform.position + offset);
+        if ((nextPosition - transform.position).sqrMagnitude < 0.0000001f)
             return false;
 
+        if (!TryGetGroundHeight(nextPosition, out float groundHeight))
+            return false;
+
+        nextPosition.y = groundHeight;
         transform.position = nextPosition;
         return true;
     }
