@@ -3009,6 +3009,26 @@ PrefabInstance:
     serializedVersion: 3
     m_TransformParent: {fileID: 0}
     m_Modifications:
+    - target: {fileID: 2699195345538012245, guid: ead801500b9048e438e0706552be525f, type: 3}
+      propertyPath: movementBoundary
+      value:
+      objectReference: {fileID: 834118205}
+    - target: {fileID: 2699195345538012245, guid: ead801500b9048e438e0706552be525f, type: 3}
+      propertyPath: walkableGround.Array.size
+      value: 3
+      objectReference: {fileID: 0}
+    - target: {fileID: 2699195345538012245, guid: ead801500b9048e438e0706552be525f, type: 3}
+      propertyPath: 'walkableGround.Array.data[0]'
+      value:
+      objectReference: {fileID: 175631059}
+    - target: {fileID: 2699195345538012245, guid: ead801500b9048e438e0706552be525f, type: 3}
+      propertyPath: 'walkableGround.Array.data[1]'
+      value:
+      objectReference: {fileID: 2086150559}
+    - target: {fileID: 2699195345538012245, guid: ead801500b9048e438e0706552be525f, type: 3}
+      propertyPath: 'walkableGround.Array.data[2]'
+      value:
+      objectReference: {fileID: 2086150560}
     - target: {fileID: 8046051809548510713, guid: ead801500b9048e438e0706552be525f, type: 3}
       propertyPath: m_Name
       value: Gigante

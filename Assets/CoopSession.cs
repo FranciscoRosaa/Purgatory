@@ -23,7 +23,7 @@ internal sealed class CoopSession : MonoBehaviour
     private const int SnapshotHeaderBytes = 8;
     private const int PlayerBytes = 24;
     private const int PositionBytes = 46;
-    private const int CombatSnapshotBytes = 61;
+    private const int CombatSnapshotBytes = 82;
     private const float RemoteDodgeGrace = 0.15f;
     private const float MeleePacketSlack = 0.10f;
     private const byte NoDash = byte.MaxValue;
@@ -70,6 +70,7 @@ internal sealed class CoopSession : MonoBehaviour
     private PlayerMeleeCombo localMelee;
     private GameplayHud gameplayHud;
     private LungeMan lungeMan;
+    private GiantChargeAttack giant;
     private Task authentication;
     private string pendingInvite;
     private bool hosting, busy, started, previousRunInBackground;
@@ -227,6 +228,7 @@ internal sealed class CoopSession : MonoBehaviour
         localMelee = localBlock.GetComponent<PlayerMeleeCombo>();
         gameplayHud = FindAnyObjectByType<GameplayHud>();
         lungeMan = FindAnyObjectByType<LungeMan>();
+        giant = FindAnyObjectByType<GiantChargeAttack>();
         Vector2 spawn = Spawn(localId);
         localBlock.position = new Vector3(spawn.x, localBlock.position.y, spawn.y);
     }
@@ -459,6 +461,7 @@ internal sealed class CoopSession : MonoBehaviour
             writer.WriteInt(recipient.Value.Health);
             writer.WriteUInt(recipient.Value.DodgeSequence);
             WriteEnemy(ref writer, lungeMan != null ? lungeMan.GetState() : default);
+            WriteGiant(ref writer, giant != null ? giant.GetState() : default);
             driver.EndSend(writer);
         }
     }
@@ -517,6 +520,8 @@ internal sealed class CoopSession : MonoBehaviour
         }
         var enemyState = ReadEnemy(ref reader);
         lungeMan?.ApplyState(enemyState);
+        var giantState = ReadGiant(ref reader);
+        giant?.ApplyState(giantState);
     }
 
     internal void QueueMeleeStrike(Vector3 forward, int strike)
@@ -601,6 +606,22 @@ internal sealed class CoopSession : MonoBehaviour
     }
 
     private static Vector3 ToWorld(Vector2 position) => new Vector3(position.x, 0f, position.y);
+
+    private static void WriteGiant(ref DataStreamWriter writer, GiantChargeAttack.State state)
+    {
+        writer.WriteByte((byte)state.Phase);
+        WriteVector(ref writer, state.Position);
+        writer.WriteFloat(state.Yaw);
+        writer.WriteFloat(state.Progress);
+    }
+
+    private static GiantChargeAttack.State ReadGiant(ref DataStreamReader reader) => new GiantChargeAttack.State
+    {
+        Phase = (GiantChargeAttack.Phase)reader.ReadByte(),
+        Position = ReadVector(ref reader),
+        Yaw = reader.ReadFloat(),
+        Progress = reader.ReadFloat()
+    };
 
     private static void WriteEnemy(ref DataStreamWriter writer, LungeMan.State state)
     {
@@ -760,6 +781,7 @@ internal sealed class CoopSession : MonoBehaviour
         localMelee = null;
         gameplayHud = null;
         lungeMan = null;
+        giant = null;
         meleeSequence = 0;
         meleeYaw = 0f;
         meleeStrike = 0;
