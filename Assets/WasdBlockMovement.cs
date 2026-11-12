@@ -31,12 +31,26 @@ public sealed class WasdBlockMovement : MonoBehaviour
     private Animator characterAnimator;
     private Vector3 previousPosition;
     private DashPresentation dashPresentation;
+    private float attackSlowUntil;
+    private float attackSpeedMultiplier = 1f;
 
     internal bool UsesDashGrounding { get; private set; }
     internal bool IsDodging => dashTimeLeft > 0f || dashedThisFrame || UsesDashGrounding;
     internal Material WindMaterial => dashWindMaterial;
     internal byte MeleeFlashSequence { get; private set; }
     internal float DashReach => dashSpeed * dashDuration;
+    internal bool IsAttackSlowed => Time.time < attackSlowUntil;
+    internal float CurrentMoveSpeed => speed * (IsAttackSlowed ? attackSpeedMultiplier : 1f);
+
+    internal void SlowForAttack(float multiplier, float duration)
+    {
+        attackSpeedMultiplier = Mathf.Clamp01(multiplier);
+        attackSlowUntil = Time.time + Mathf.Max(0f, duration);
+    }
+
+    internal void ClearAttackSlow() => attackSlowUntil = 0f;
+
+    internal void FlashAreaAttack() => dashPresentation?.FlashMelee();
 
     internal Vector3 ClampToMovementBoundary(Vector3 position)
     {
@@ -106,6 +120,7 @@ public sealed class WasdBlockMovement : MonoBehaviour
         dashTimeLeft = 0f;
         dashedThisFrame = false;
         UsesDashGrounding = false;
+        ClearAttackSlow();
         dashPresentation?.Reset();
     }
 
@@ -147,13 +162,13 @@ public sealed class WasdBlockMovement : MonoBehaviour
         if (direction == Vector3.zero)
             return;
 
-        if (dashPressed && Time.time >= nextDashTime)
+        if (dashPressed && Time.time >= nextDashTime && !IsAttackSlowed)
         {
             BeginDash(direction);
             return;
         }
 
-        TryMove(direction * (speed * Time.deltaTime));
+        TryMove(direction * (CurrentMoveSpeed * Time.deltaTime));
 #endif
     }
 

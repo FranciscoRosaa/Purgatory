@@ -2431,6 +2431,16 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::PlayerMeleeCombo
   attackCooldown: 1
+  meleeRadius: 2.35
+  maxTargetHeightDifference: 2
+  areaRadius: 4
+  areaDuration: 0.65
+  areaCooldown: 3
+  areaDamage: 18
+  areaMovementMultiplier: 0.35
+  areaAnimation: {fileID: -203655887218126122, guid: 1e7b335161e1ea54c84f5cc0ae16270e, type: 3}
+  areaVfxMaterial: {fileID: 2100000, guid: cdbe26f7a6cca2c448d0c7a5796a4e65, type: 2}
+  areaVfxSpeed: 1.3
   swingA:
     Start: 0.28
     Impact: 0.55

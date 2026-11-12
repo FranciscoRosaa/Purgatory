@@ -21,8 +21,8 @@ internal sealed class CoopSession : MonoBehaviour
     private const byte PositionMessage = 1;
     private const byte SnapshotMessage = 2;
     private const int SnapshotHeaderBytes = 8;
-    private const int PlayerBytes = 11;
-    private const int PositionBytes = 34;
+    private const int PlayerBytes = 24;
+    private const int PositionBytes = 46;
     private const int CombatSnapshotBytes = 61;
     private const float RemoteDodgeGrace = 0.15f;
     private const float MeleePacketSlack = 0.10f;
@@ -39,6 +39,10 @@ internal sealed class CoopSession : MonoBehaviour
         public uint LastMelee;
         public float NextMelee;
         public bool MeleeArmed;
+        public uint LastAreaRequest, AreaSequence;
+        public float NextAreaAttack;
+        public float AreaStartedAt = float.NegativeInfinity;
+        public Vector3 AreaOrigin;
         public Vector3 DashOrigin, DashEnd;
         public float DashStartedAt = float.NegativeInfinity;
         public LungeMan PendingLunge;
@@ -54,6 +58,7 @@ internal sealed class CoopSession : MonoBehaviour
         public byte Appearance;
         public byte MeleeFlash;
         public CharacterWhiteFlash WhiteFlash;
+        public uint AreaSequence;
     }
 
     private readonly Dictionary<NetworkConnection, Peer> peers = new Dictionary<NetworkConnection, Peer>();
@@ -352,6 +357,9 @@ internal sealed class CoopSession : MonoBehaviour
             dashAge = (byte)Mathf.Clamp(Mathf.RoundToInt(age * 1000f), 0, NoDash - 1);
         writer.WriteByte(dashAge);
         WritePosition(ref writer, new Vector2(dashOrigin.x, dashOrigin.z));
+        writer.WriteUInt(localMelee != null ? localMelee.AreaAttackSequence : 0u);
+        Vector3 areaOrigin = localMelee != null ? localMelee.AreaAttackOrigin : Vector3.zero;
+        WritePosition(ref writer, new Vector2(areaOrigin.x, areaOrigin.z));
         driver.EndSend(writer);
     }
 
@@ -371,6 +379,8 @@ internal sealed class CoopSession : MonoBehaviour
         byte meleeFlash = reader.ReadByte();
         byte dashAge = reader.ReadByte();
         var dashOrigin = ReadPosition(ref reader);
+        uint areaSequence = reader.ReadUInt();
+        var areaOrigin = ReadPosition(ref reader);
         if (positionSequence <= peer.LastSequence || !Valid(position) || appearance >= CharacterProfiles.AppearanceCount)
             return;
         peer.LastSequence = positionSequence;
@@ -398,14 +408,32 @@ internal sealed class CoopSession : MonoBehaviour
                 if (peer.MeleeArmed && impactFlash == meleeFlash)
                 {
                     peer.MeleeArmed = false;
-                    if (peer.Health > 0 && lungeMan != null && strike < PlayerMeleeCombo.StrikeCount && Mathf.Abs(yaw) <= 360f)
-                        lungeMan.ApplyMeleeStrike(ToWorld(position), Quaternion.Euler(0f, yaw, 0f) * Vector3.forward, strike);
+                    if (peer.Health > 0 && localMelee != null && now >= peer.AreaStartedAt + localMelee.AreaDuration &&
+                        strike < PlayerMeleeCombo.StrikeCount && Mathf.Abs(yaw) <= 360f)
+                        localMelee.ApplyMeleeAttack(ToWorld(position), Quaternion.Euler(0f, yaw, 0f) * Vector3.forward, strike);
+                }
+            }
+            if (areaSequence > peer.LastAreaRequest)
+            {
+                peer.LastAreaRequest = areaSequence;
+                if (peer.Health > 0 && localMelee != null && now + MeleePacketSlack >= peer.NextAreaAttack &&
+                    Valid(areaOrigin) && (areaOrigin - position).sqrMagnitude <= 1f &&
+                    now - peer.DashStartedAt >= WasdBlockMovement.PerfectDodgeWindow)
+                {
+                    peer.AreaSequence = areaSequence;
+                    peer.AreaStartedAt = now;
+                    peer.AreaOrigin = ToWorld(areaOrigin);
+                    peer.AreaOrigin.y = localBlock.position.y;
+                    peer.NextAreaAttack = now + localMelee.AreaCooldown;
+                    peer.MeleeArmed = false;
+                    peer.NextMelee = Mathf.Max(peer.NextMelee, now + localMelee.AreaDuration);
+                    localMelee.SpawnAreaWave(peer.AreaOrigin, true);
                 }
             }
         }
         peer.MeleeFlash = meleeFlash;
         if (localBlock != null)
-            SetAvatar(peer.Id, position, appearance, meleeFlash);
+            SetAvatar(peer.Id, position, appearance, meleeFlash, peer.AreaSequence, peer.AreaOrigin, AreaProgress(peer));
     }
 
     private void Broadcast()
@@ -420,9 +448,14 @@ internal sealed class CoopSession : MonoBehaviour
             writer.WriteByte(recipient.Value.Id);
             writer.WriteByte(started ? (byte)1 : (byte)0);
             writer.WriteByte((byte)Count);
-            WritePlayer(ref writer, 1, LocalPosition, localAppearance, localMovement != null ? localMovement.MeleeFlashSequence : (byte)0);
+            WritePlayer(ref writer, 1, LocalPosition, localAppearance,
+                localMovement != null ? localMovement.MeleeFlashSequence : (byte)0,
+                localMelee != null ? localMelee.AreaAttackSequence : 0u,
+                localMelee != null ? localMelee.AreaAttackOrigin : Vector3.zero,
+                localMelee != null ? localMelee.AreaAttackProgress : 1f);
             foreach (var peer in peers.Values)
-                WritePlayer(ref writer, peer.Id, peer.Position, peer.Appearance, peer.MeleeFlash);
+                WritePlayer(ref writer, peer.Id, peer.Position, peer.Appearance, peer.MeleeFlash,
+                    peer.AreaSequence, peer.AreaOrigin, AreaProgress(peer));
             writer.WriteInt(recipient.Value.Health);
             writer.WriteUInt(recipient.Value.DodgeSequence);
             WriteEnemy(ref writer, lungeMan != null ? lungeMan.GetState() : default);
@@ -461,10 +494,14 @@ internal sealed class CoopSession : MonoBehaviour
             var position = ReadPosition(ref reader);
             byte appearance = reader.ReadByte();
             byte meleeFlash = reader.ReadByte();
+            uint areaSequence = reader.ReadUInt();
+            var areaOrigin = ToWorld(ReadPosition(ref reader));
+            areaOrigin.y = localBlock.position.y;
+            float areaProgress = reader.ReadByte() / 255f;
             if (id < 1 || id > MaxPlayers || id == localId || !Valid(position) || appearance >= CharacterProfiles.AppearanceCount)
                 continue;
             present |= 1 << id;
-            SetAvatar(id, position, appearance, meleeFlash);
+            SetAvatar(id, position, appearance, meleeFlash, areaSequence, areaOrigin, areaProgress);
         }
         for (byte id = 1; id <= MaxPlayers; id++)
             if ((present & (1 << id)) == 0)
@@ -601,7 +638,11 @@ internal sealed class CoopSession : MonoBehaviour
     private static Vector3 ReadVector(ref DataStreamReader reader) =>
         new Vector3(reader.ReadFloat(), reader.ReadFloat(), reader.ReadFloat());
 
-    private void SetAvatar(byte id, Vector2 position, byte appearance, byte meleeFlash)
+    private float AreaProgress(Peer peer) => peer.AreaSequence == 0 || localMelee == null ? 1f :
+        Mathf.Clamp01((Time.time - peer.AreaStartedAt) / localMelee.AreaDuration);
+
+    private void SetAvatar(byte id, Vector2 position, byte appearance, byte meleeFlash,
+        uint areaSequence, Vector3 areaOrigin, float areaProgress)
     {
         bool created = false;
         if (!avatars.TryGetValue(id, out var avatar))
@@ -624,6 +665,16 @@ internal sealed class CoopSession : MonoBehaviour
             avatar.MeleeFlash = meleeFlash;
             avatar.WhiteFlash.Pulse();
         }
+        if (avatar.AreaSequence != areaSequence)
+        {
+            avatar.AreaSequence = areaSequence;
+            if (!IsHost && areaSequence != 0 && areaProgress < 1f && localMelee != null)
+            {
+                localMelee.SpawnAreaWave(areaOrigin, false, areaProgress);
+                avatar.WhiteFlash.Pulse();
+                localMelee.PlayAreaAnimation(avatar.Object.GetComponentInChildren<Animator>(), areaProgress);
+            }
+        }
         var nextPosition = new Vector3(position.x, localBlock.position.y, position.y);
         var delta = nextPosition - avatar.Object.transform.position;
         bool moving = !created && delta.sqrMagnitude > 0.000001f && delta.sqrMagnitude < 25f;
@@ -643,12 +694,16 @@ internal sealed class CoopSession : MonoBehaviour
         avatars.Remove(id);
     }
 
-    private static void WritePlayer(ref DataStreamWriter writer, byte id, Vector2 position, byte appearance, byte meleeFlash)
+    private static void WritePlayer(ref DataStreamWriter writer, byte id, Vector2 position, byte appearance, byte meleeFlash,
+        uint areaSequence, Vector3 areaOrigin, float areaProgress)
     {
         writer.WriteByte(id);
         WritePosition(ref writer, position);
         writer.WriteByte(appearance);
         writer.WriteByte(meleeFlash);
+        writer.WriteUInt(areaSequence);
+        WritePosition(ref writer, new Vector2(areaOrigin.x, areaOrigin.z));
+        writer.WriteByte((byte)Mathf.Clamp(Mathf.RoundToInt(areaProgress * 255f), 0, 255));
     }
 
     private static void WritePosition(ref DataStreamWriter writer, Vector2 position)

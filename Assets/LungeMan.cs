@@ -305,24 +305,8 @@ public sealed class LungeMan : MonoBehaviour
         return false;
     }
 
-    internal void ReceivePlayerStrike(Vector3 position, Vector3 forward, int strike)
+    internal void ApplyMeleeStrike(int strike)
     {
-        if (hud == null || hud.Health <= 0)
-            return;
-
-        if (IsReplica)
-            session.QueueMeleeStrike(forward, strike);
-        else
-            ApplyMeleeStrike(position, forward, strike);
-    }
-
-    internal void ApplyMeleeStrike(Vector3 position, Vector3 forward, int strike)
-    {
-        Vector3 toward = Planar(transform.position - position);
-        if (Health <= 0 || toward.sqrMagnitude > 2.35f * 2.35f ||
-            (toward.sqrMagnitude > 0.01f && Vector3.Dot(toward.normalized, Planar(forward).normalized) < 0.35f))
-            return;
-
         int baseDamage = strike switch
         {
             0 => firstMeleeDamage,
@@ -330,7 +314,14 @@ public sealed class LungeMan : MonoBehaviour
             2 => thirdMeleeDamage,
             _ => 0
         };
-        if (baseDamage <= 0)
+        ApplyPlayerDamage(baseDamage);
+    }
+
+    internal void ApplyAreaStrike(int damage) => ApplyPlayerDamage(damage);
+
+    private void ApplyPlayerDamage(int baseDamage)
+    {
+        if (Health <= 0 || baseDamage <= 0 || IsReplica)
             return;
 
         float roll = Random.value;
