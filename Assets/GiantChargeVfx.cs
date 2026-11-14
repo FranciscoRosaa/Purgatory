@@ -1,138 +1,99 @@
 using UnityEngine;
-using UnityEngine.Rendering;
 
 internal sealed class GiantChargeVfx
 {
-    private const int Segments = 96;
     private readonly Transform actor;
     private readonly GameObject root;
-    private readonly Mesh aura;
-    private readonly MeshRenderer auraRenderer;
-    private readonly Vector3[] vertices = new Vector3[(Segments + 1) * 4];
-    private readonly Color[] colors = new Color[(Segments + 1) * 4];
-    private readonly ParticleSystem smoke;
+    private readonly InwardChargeSmoke smoke;
+    private readonly ParticleSystem dust;
     private readonly Material material;
-    private readonly Material auraMaterial;
     private readonly Texture2D texture;
-    private readonly float radius;
-    private Vector3 lastCloud;
-    private float emission;
+    private Vector3 lastDust;
+    private float dustDistance;
     private bool wasCharging;
 
     internal GiantChargeVfx(Transform actor, Material template, float radius)
     {
         this.actor = actor;
-        this.radius = radius;
-        root = new GameObject("Gigante Charge VFX");
+        root = new GameObject("Gigante Sprint VFX");
         root.transform.SetParent(actor, false);
         texture = SmokeTexture();
         material = new Material(template) { mainTexture = texture };
         material.SetColor("_BaseColor", Color.white);
-        if (material.HasProperty("_Cull")) material.SetFloat("_Cull", 0f);
-        auraMaterial = new Material(material) { mainTexture = Texture2D.whiteTexture };
-        smoke = DashPresentation.CreateWind(root.transform, material, "Gigante Smoke and Wind");
-        var renderer = smoke.GetComponent<ParticleSystemRenderer>();
-        renderer.renderMode = ParticleSystemRenderMode.Billboard;
-        var main = smoke.main;
-        main.maxParticles = 160;
-        var auraObject = new GameObject("Black Charge Aura");
-        auraObject.transform.SetParent(root.transform, false);
-        aura = new Mesh { name = "Gigante jagged windup aura" };
-        aura.MarkDynamic();
-        aura.vertices = vertices;
-        var triangles = new int[Segments * 3 * 6];
-        int t = 0;
-        for (int s = 0; s < Segments; s++)
-            for (int r = 0; r < 3; r++)
-            {
-                int a = s * 4 + r, b = a + 4;
-                triangles[t++] = a; triangles[t++] = b; triangles[t++] = a + 1;
-                triangles[t++] = a + 1; triangles[t++] = b; triangles[t++] = b + 1;
-            }
-        aura.triangles = triangles;
-        auraObject.AddComponent<MeshFilter>().sharedMesh = aura;
-        auraRenderer = auraObject.AddComponent<MeshRenderer>();
-        auraRenderer.sharedMaterial = auraMaterial;
-        auraRenderer.shadowCastingMode = ShadowCastingMode.Off;
-        auraRenderer.receiveShadows = false;
-        auraRenderer.enabled = false;
+        smoke = new InwardChargeSmoke(root.transform, material, radius);
+        dust = CreateCloud(root.transform, material, "Footstep dust", 40);
     }
 
-    internal void BeginCharge(Vector3 position) => lastCloud = position;
-
-    internal void Update(bool winding, bool charging, float progress, Vector3 direction, float deltaTime)
+    internal static ParticleSystem CreateCloud(Transform parent, Material material, string name, int capacity)
     {
-        auraRenderer.enabled = winding;
-        if (winding)
+        var cloud = DashPresentation.CreateWind(parent, material, name);
+        cloud.GetComponent<ParticleSystemRenderer>().renderMode = ParticleSystemRenderMode.Billboard;
+        var main = cloud.main;
+        main.maxParticles = capacity;
+        var fade = cloud.colorOverLifetime;
+        fade.color = new Gradient
         {
-            DrawAura(progress);
-            emission += deltaTime * 34f;
-            int count = Mathf.Min(12, Mathf.FloorToInt(emission));
-            emission -= count;
-            for (int i = 0; i < count; i++)
+            alphaKeys = new[]
             {
-                float angle = Random.value * Mathf.PI * 2f;
-                var side = new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle));
-                Emit(actor.position + side * Random.Range(0.5f, radius),
-                    -side * 0.5f + Vector3.up * Random.Range(1f, 2f),
-                    new Color(0.008f, 0.012f, 0.015f, 0.70f), Random.Range(0.45f, 0.85f), 0.38f);
+                new GradientAlphaKey(0f, 0f), new GradientAlphaKey(1f, 0.16f),
+                new GradientAlphaKey(0.72f, 0.55f), new GradientAlphaKey(0f, 1f)
             }
-        }
+        };
+        return cloud;
+    }
+
+    internal void Update(bool winding, bool charging, float progress, float windupDuration, Vector3 direction, float deltaTime,
+        Vector3 chest, Transform leftFoot, Transform rightFoot)
+    {
+        smoke.Update(chest, actor.position.y, winding ? (1f - progress) * windupDuration : 0f, progress, deltaTime);
+
         if (charging)
         {
-            if (!wasCharging) BeginCharge(actor.position);
-            float distance = Vector3.Distance(actor.position, lastCloud);
-            int count = Mathf.Clamp(Mathf.CeilToInt(distance / 0.28f), 0, 16);
-            var lateral = Vector3.Cross(Vector3.up, direction);
+            if (!wasCharging)
+            {
+                lastDust = actor.position;
+                dustDistance = 0f;
+            }
+            dustDistance += Vector3.Distance(actor.position, lastDust);
+            lastDust = actor.position;
+            const float spacing = 0.52f;
+            int count = Mathf.Min(4, Mathf.FloorToInt(dustDistance / spacing));
+            dustDistance -= count * spacing;
             for (int i = 0; i < count; i++)
             {
-                var point = Vector3.Lerp(lastCloud, actor.position, (i + 1f) / count);
-                for (int puff = 0; puff < 2; puff++)
-                    Emit(point - direction * 0.9f + lateral * Random.Range(-0.45f, 0.45f) +
-                        Vector3.up * Random.Range(0.45f, 1.15f),
-                        -direction * Random.Range(1.5f, 3.5f) + Vector3.up * 0.5f,
-                        new Color(0.84f, 1f, 1f, 0.8f), Random.Range(0.7f, 1.3f), Random.Range(0.18f, 0.32f));
+                float leftHeight = leftFoot != null ? leftFoot.position.y : float.PositiveInfinity;
+                float rightHeight = rightFoot != null ? rightFoot.position.y : float.PositiveInfinity;
+                float lowest = Mathf.Min(leftHeight, rightHeight);
+                if (leftHeight <= lowest + 0.18f) EmitFootDust(leftFoot, direction);
+                if (rightHeight <= lowest + 0.18f) EmitFootDust(rightFoot, direction);
             }
-            lastCloud = actor.position;
         }
-        else if (!winding)
-            emission = 0f;
         wasCharging = charging;
     }
 
-    private void DrawAura(float progress)
+    private void EmitFootDust(Transform foot, Vector3 direction)
     {
-        float size = radius * Mathf.Lerp(0.65f, 1f, progress);
-        for (int s = 0; s <= Segments; s++)
-        {
-            float angle = s * Mathf.PI * 2f / Segments;
-            float tip = 0.8f + Mathf.Pow(Mathf.Max(0f, Mathf.Sin(angle * 14f + Time.time * 0.5f)), 5f) * 0.55f;
-            for (int r = 0; r < 4; r++)
-            {
-                int index = s * 4 + r;
-                float fraction = r == 0 ? 0f : r == 1 ? 0.56f : r == 2 ? 0.84f : 1.05f;
-                float distance = size * tip * fraction;
-                vertices[index] = new Vector3(Mathf.Sin(angle) * distance, 0.07f, Mathf.Cos(angle) * distance);
-                float alpha = r == 0 ? 0.08f : r == 1 ? 0.55f : r == 2 ? 0.62f : 0f;
-                colors[index] = new Color(0.006f, 0.01f, 0.014f, alpha * Mathf.Lerp(0.45f, 1f, progress));
-            }
-        }
-        aura.vertices = vertices;
-        aura.colors = colors;
-        aura.RecalculateBounds();
+        if (foot == null)
+            return;
+        var point = foot.position - direction * Random.Range(0.08f, 0.23f);
+        point.y = actor.position.y + 0.12f;
+        Emit(dust, point, -direction * Random.Range(0.45f, 0.85f) + Vector3.up * 0.25f,
+            new Color(0.59f, 0.52f, 0.41f, Random.Range(0.22f, 0.35f)),
+            Random.Range(0.36f, 0.59f), Random.Range(0.3f, 0.48f));
     }
 
-    private void Emit(Vector3 position, Vector3 velocity, Color color, float size, float lifetime)
+    internal static void Emit(ParticleSystem cloud, Vector3 position, Vector3 velocity, Color color,
+        float size, float lifetime)
     {
-        if (!smoke.isPlaying) smoke.Play();
-        smoke.Emit(new ParticleSystem.EmitParams
+        if (!cloud.isPlaying) cloud.Play();
+        cloud.Emit(new ParticleSystem.EmitParams
         {
             position = position, velocity = velocity, startColor = color,
             startSize = size, startLifetime = lifetime, rotation = Random.Range(0f, 360f)
         }, 1);
     }
 
-    private static Texture2D SmokeTexture()
+    internal static Texture2D SmokeTexture()
     {
         const int size = 64;
         var texture = new Texture2D(size, size, TextureFormat.RGBA32, false)
@@ -142,9 +103,9 @@ internal sealed class GiantChargeVfx
             for (int x = 0; x < size; x++)
             {
                 float dx = (x + 0.5f) / size * 2f - 1f, dy = (y + 0.5f) / size * 2f - 1f;
-                float fade = Mathf.Pow(Mathf.Clamp01(1f - Mathf.Sqrt(dx * dx + dy * dy)), 1.4f);
-                pixels[y * size + x] = new Color(1f, 1f, 1f,
-                    fade * (0.55f + Mathf.PerlinNoise(x * 0.13f, y * 0.13f) * 0.45f));
+                float noise = Mathf.PerlinNoise(x * 0.095f, y * 0.095f);
+                float fade = Mathf.Pow(Mathf.Clamp01(1f - Mathf.Sqrt(dx * dx + dy * dy)), 1.25f);
+                pixels[y * size + x] = new Color(1f, 1f, 1f, fade * Mathf.Lerp(0.22f, 1f, noise));
             }
         texture.SetPixels(pixels);
         texture.Apply(false, true);
@@ -153,18 +114,58 @@ internal sealed class GiantChargeVfx
 
     internal void Reset()
     {
-        auraRenderer.enabled = false;
-        smoke.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
-        emission = 0f;
+        smoke.Clear();
+        dust.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        dustDistance = 0f;
         wasCharging = false;
     }
 
     internal void Dispose()
     {
-        Object.Destroy(aura);
         Object.Destroy(material);
-        Object.Destroy(auraMaterial);
         Object.Destroy(texture);
         Object.Destroy(root);
+    }
+}
+
+internal sealed class InwardChargeSmoke
+{
+    private readonly float radius, scale;
+    private readonly ParticleSystem particles;
+    private float budget;
+
+    internal InwardChargeSmoke(Transform parent, Material material, float radius, float scale = 1f)
+    {
+        this.radius = radius;
+        this.scale = scale;
+        particles = GiantChargeVfx.CreateCloud(parent, material, "Inward black smoke", 100);
+    }
+
+    internal void Update(Vector3 chest, float ground, float chargeLeft, float progress, float deltaTime)
+    {
+        if (chargeLeft <= 0.16f)
+        {
+            budget = 0f;
+            return;
+        }
+        budget += deltaTime * Mathf.Lerp(30f, 62f, progress);
+        int count = Mathf.Min(12, Mathf.FloorToInt(budget));
+        budget -= count;
+        for (int i = 0; i < count; i++)
+        {
+            float angle = Random.value * Mathf.PI * 2f;
+            var radial = new Vector3(Mathf.Sin(angle), 0f, Mathf.Cos(angle));
+            var origin = chest + radial * Random.Range(radius * 0.55f, radius * 1.25f);
+            origin.y = Mathf.Lerp(ground + 0.14f, chest.y + 0.8f * scale, Random.value);
+            float life = Mathf.Min(chargeLeft, Random.Range(0.32f, 0.54f));
+            GiantChargeVfx.Emit(particles, origin, (chest - origin) / life, new Color(0.022f, 0.023f, 0.026f, 0.82f),
+                Random.Range(0.65f, 1.35f) * scale, life);
+        }
+    }
+
+    internal void Clear()
+    {
+        particles.Stop(true, ParticleSystemStopBehavior.StopEmittingAndClear);
+        budget = 0f;
     }
 }

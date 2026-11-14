@@ -56,7 +56,10 @@ public sealed class GameplayHud : MonoBehaviour
         int fullHealth = Mathf.Max(1, maxHealth);
         int newHealth = Mathf.Clamp(value, 0, fullHealth);
         if (newHealth < health)
+        {
             damageTime = Time.unscaledTime;
+            CombatAudio.PlayerHurt();
+        }
         health = newHealth;
         healthFill.anchorMax = new Vector2((float)health / fullHealth, 1f);
         healthLabel.text = $"{health} / {fullHealth}";

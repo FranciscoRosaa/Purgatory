@@ -10,6 +10,7 @@ internal sealed class EnemyDamageFeedback
     {
         internal Text Label;
         internal Vector3 Anchor;
+        internal Transform Target;
         internal float Started;
         internal float Side;
         internal float Stagger;
@@ -22,16 +23,18 @@ internal sealed class EnemyDamageFeedback
     private readonly RectTransform bar;
     private readonly RectTransform fill;
     private readonly Font font;
+    private readonly float heightOffset;
     private readonly List<FloatingHit> hits = new List<FloatingHit>();
     private float nextSide = 1f;
 
-    internal EnemyDamageFeedback(RectTransform canvas, Camera camera)
+    internal EnemyDamageFeedback(RectTransform canvas, Camera camera, string enemyName = "LungeMan", float heightOffset = 0f)
     {
         this.canvas = canvas;
         this.camera = camera;
+        this.heightOffset = heightOffset;
         font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
 
-        root = CreateRect("LungeMan Combat UI", canvas);
+        root = CreateRect(enemyName + " Combat UI", canvas);
         root.anchorMin = Vector2.zero;
         root.anchorMax = Vector2.one;
         root.offsetMin = root.offsetMax = Vector2.zero;
@@ -57,26 +60,35 @@ internal sealed class EnemyDamageFeedback
 
     internal void ShowHit(Vector3 position, int amount, LungeMan.CriticalHit critical)
     {
+        int fontSize = critical == LungeMan.CriticalHit.High ? 48 : critical == LungeMan.CriticalHit.Medium ? 42 : 36;
+        Color tint = critical == LungeMan.CriticalHit.High ? new Color32(255, 223, 88, 255)
+            : critical == LungeMan.CriticalHit.Medium ? new Color32(255, 155, 87, 255)
+            : new Color32(255, 240, 220, 255);
+        ShowNumber("Damage Number", $"-{amount}", tint, fontSize, position + Vector3.up * (1.85f + heightOffset), null);
+    }
+
+    internal void ShowHeal(Transform target, float height, int amount) =>
+        ShowNumber("Healing Number", $"+{amount}", new Color32(96, 255, 105, 255), 36, Vector3.up * height, target);
+
+    private void ShowNumber(string name, string text, Color tint, int fontSize, Vector3 anchor, Transform target)
+    {
         if (root == null)
             return;
 
-        var rect = CreateRect("Damage Number", root);
+        var rect = CreateRect(name, root);
         rect.sizeDelta = new Vector2(160f, 72f);
         var label = rect.gameObject.AddComponent<Text>();
         label.font = font;
         label.fontStyle = FontStyle.Bold;
-        label.fontSize = critical == LungeMan.CriticalHit.High ? 48
-            : critical == LungeMan.CriticalHit.Medium ? 42 : 36;
+        label.fontSize = fontSize;
         label.alignment = TextAnchor.MiddleCenter;
         label.raycastTarget = false;
-        label.text = $"-{amount}";
+        label.text = text;
+        label.color = tint;
         var outline = rect.gameObject.AddComponent<Outline>();
         outline.effectColor = new Color32(12, 10, 8, 255);
         outline.effectDistance = new Vector2(3f, -3f);
 
-        Color tint = critical == LungeMan.CriticalHit.High ? new Color32(255, 223, 88, 255)
-            : critical == LungeMan.CriticalHit.Medium ? new Color32(255, 155, 87, 255)
-            : new Color32(255, 240, 220, 255);
         float now = Time.time;
         float stagger = 0f;
         foreach (var active in hits)
@@ -86,7 +98,8 @@ internal sealed class EnemyDamageFeedback
         hits.Add(new FloatingHit
         {
             Label = label,
-            Anchor = position + Vector3.up * 1.85f,
+            Anchor = anchor,
+            Target = target,
             Started = now,
             Side = nextSide,
             Stagger = stagger,
@@ -102,7 +115,7 @@ internal sealed class EnemyDamageFeedback
 
         root.gameObject.SetActive(true);
         bool visible = hasTakenDamage && health > 0
-            && Place(bar, position + Vector3.up * 2.38f, Vector2.zero);
+            && Place(bar, position + Vector3.up * (2.38f + heightOffset), Vector2.zero);
         bar.gameObject.SetActive(visible);
         fill.anchorMax = new Vector2((float)health / maxHealth, 1f);
 
@@ -120,7 +133,8 @@ internal sealed class EnemyDamageFeedback
             float sideways = 62f + 19f * progress + hit.Stagger * 0.6f;
             var offset = new Vector2(hit.Side * sideways, 8f + hit.Stagger + 52f * progress);
             var rect = hit.Label.rectTransform;
-            rect.gameObject.SetActive(Place(rect, hit.Anchor, offset));
+            Vector3 anchor = hit.Target != null ? hit.Target.position + hit.Anchor : hit.Anchor;
+            rect.gameObject.SetActive(Place(rect, anchor, offset));
             rect.localScale = Vector3.one * Mathf.Lerp(1.25f, 1f, Mathf.Clamp01(progress * 7f));
             var color = hit.Tint;
             color.a = 1f - Mathf.InverseLerp(0.64f, 1f, progress);

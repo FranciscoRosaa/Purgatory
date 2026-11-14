@@ -5,7 +5,7 @@ using UnityEngine.Rendering;
 using UnityEngine.Serialization;
 
 [DefaultExecutionOrder(520)]
-public sealed class LungeMan : MonoBehaviour
+public sealed class LungeMan : CombatEnemy
 {
     internal const int MaxHealth = 50;
     private const int HitHistorySize = 8;
@@ -77,7 +77,8 @@ public sealed class LungeMan : MonoBehaviour
     private State remote;
     private bool hasRemote;
 
-    internal int Health { get; private set; } = MaxHealth;
+    internal override int Health { get; private protected set; } = MaxHealth;
+    internal override int HealthLimit => MaxHealth;
     private bool IsReplica => session != null && session.InMatch && !session.IsHost;
 
     private void Start()
@@ -305,7 +306,7 @@ public sealed class LungeMan : MonoBehaviour
         return false;
     }
 
-    internal void ApplyMeleeStrike(int strike)
+    internal override void ApplyMeleeStrike(int strike)
     {
         int baseDamage = strike switch
         {
@@ -317,20 +318,15 @@ public sealed class LungeMan : MonoBehaviour
         ApplyPlayerDamage(baseDamage);
     }
 
-    internal void ApplyAreaStrike(int damage) => ApplyPlayerDamage(damage);
+    internal override void ApplyAreaStrike(int damage) => ApplyPlayerDamage(damage);
 
     private void ApplyPlayerDamage(int baseDamage)
     {
         if (Health <= 0 || baseDamage <= 0 || IsReplica)
             return;
 
-        float roll = Random.value;
-        var critical = roll < 0.05f ? CriticalHit.High : roll < 0.15f ? CriticalHit.Medium : CriticalHit.None;
-        float multiplier = critical == CriticalHit.High ? 1.44f : critical == CriticalHit.Medium ? 1.16f : 1f;
-        int damage = Mathf.Min(Health, Mathf.RoundToInt(Mathf.Min(baseDamage, MaxHealth) * multiplier));
-        Health -= damage;
-        // One byte per confirmed hit: six bits for HP lost, two for the critical tier.
-        hitHistory = (hitHistory << 8) | (uint)(damage | (int)critical << 6);
+        Health -= RollPlayerDamage(Mathf.Min(baseDamage, MaxHealth), Health, out byte hit);
+        hitHistory = (hitHistory << 8) | hit;
         hitSequence++;
         if (Health == 0)
             phase = Phase.Dead;
@@ -488,6 +484,7 @@ public sealed class LungeMan : MonoBehaviour
         {
             wasLunging = true;
             lastWindPosition = origin;
+            CombatAudio.LungeCut(transform.position);
             EmitWind(origin, 16);
         }
 
@@ -608,5 +605,36 @@ public sealed class LungeMan : MonoBehaviour
             Object.Destroy(mesh);
             Object.Destroy(material);
         }
+    }
+}
+
+public abstract class CombatEnemy : MonoBehaviour
+{
+    internal abstract int Health { get; private protected set; }
+    internal abstract int HealthLimit { get; }
+    internal abstract void ApplyMeleeStrike(int strike);
+    internal abstract void ApplyAreaStrike(int damage);
+
+    internal bool NeedsHealing => isActiveAndEnabled && Health > 0 && Health < HealthLimit;
+
+    internal int RestoreHealth(int amount)
+    {
+        if (amount <= 0 || !NeedsHealing)
+            return 0;
+
+        int restored = Mathf.Min(amount, HealthLimit - Health);
+        Health += restored;
+        return restored;
+    }
+
+    protected static int RollPlayerDamage(int baseDamage, int health, out byte hit)
+    {
+        float roll = Random.value;
+        int critical = roll < 0.05f ? 2 : roll < 0.15f ? 1 : 0;
+        float multiplier = critical == 2 ? 1.44f : critical == 1 ? 1.16f : 1f;
+        int damage = Mathf.Min(health, Mathf.RoundToInt(baseDamage * multiplier));
+        // The combat snapshot stores six bits of damage and two bits of critical tier per hit.
+        hit = (byte)(Mathf.Min(damage, 63) | (critical << 6));
+        return damage;
     }
 }

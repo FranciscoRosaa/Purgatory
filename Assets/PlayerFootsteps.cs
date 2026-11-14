@@ -36,6 +36,6 @@ public sealed class PlayerFootsteps : MonoBehaviour
         if (clip == null)
             return;
         source.pitch = Random.Range(0.94f, 1.06f);
-        source.PlayOneShot(clip);
+        source.PlayOneShot(clip, 0.5f);
     }
 }

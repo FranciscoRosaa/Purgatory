@@ -25,6 +25,10 @@ public sealed class WasdBlockMovement : MonoBehaviour
     private float dashTimeLeft;
     private float nextDashTime;
     private bool dashedThisFrame;
+    private Vector3 knockbackDirection;
+    private float knockbackTimeLeft;
+    private const float KnockbackDuration = 0.26f;
+    private const float KnockbackDistance = 1.65f;
 
     private Transform characterVisual;
     private Quaternion targetRotation;
@@ -39,6 +43,7 @@ public sealed class WasdBlockMovement : MonoBehaviour
     internal Material WindMaterial => dashWindMaterial;
     internal byte MeleeFlashSequence { get; private set; }
     internal float DashReach => dashSpeed * dashDuration;
+    internal float DashDuration => dashDuration;
     internal bool IsAttackSlowed => Time.time < attackSlowUntil;
     internal float CurrentMoveSpeed => speed * (IsAttackSlowed ? attackSpeedMultiplier : 1f);
 
@@ -52,14 +57,40 @@ public sealed class WasdBlockMovement : MonoBehaviour
 
     internal void FlashAreaAttack() => dashPresentation?.FlashMelee();
 
-    internal Vector3 ClampToMovementBoundary(Vector3 position)
+    internal void ApplySprintKnockback(Vector3 direction)
+    {
+        direction.y = 0f;
+        knockbackDirection = direction.normalized;
+        knockbackTimeLeft = KnockbackDuration;
+        dashTimeLeft = 0f;
+        dashedThisFrame = false;
+        dashPresentation?.FlashMelee();
+    }
+
+    internal Vector3 ClampToMovementBoundary(Vector3 position, float inset = 0f)
     {
         if (movementBoundary == null || !movementBoundary.enabled)
             return position;
 
         var sample = position;
         sample.y = movementBoundary.bounds.center.y;
-        var constrained = movementBoundary.ClosestPoint(sample);
+        Vector3 constrained;
+        if (inset > 0f)
+        {
+            Transform boundary = movementBoundary.transform;
+            Vector3 local = boundary.InverseTransformPoint(sample) - movementBoundary.center;
+            Vector3 halfSize = movementBoundary.size * 0.5f;
+            Vector3 scale = boundary.lossyScale;
+            float width = Mathf.Max(0f, halfSize.x - inset / Mathf.Abs(scale.x));
+            float depth = Mathf.Max(0f, halfSize.z - inset / Mathf.Abs(scale.z));
+            local.x = Mathf.Clamp(local.x, -width, width);
+            local.z = Mathf.Clamp(local.z, -depth, depth);
+            constrained = boundary.TransformPoint(local + movementBoundary.center);
+        }
+        else
+        {
+            constrained = movementBoundary.ClosestPoint(sample);
+        }
         constrained.y = position.y;
         return constrained;
     }
@@ -118,6 +149,7 @@ public sealed class WasdBlockMovement : MonoBehaviour
     private void OnDisable()
     {
         dashTimeLeft = 0f;
+        knockbackTimeLeft = 0f;
         dashedThisFrame = false;
         UsesDashGrounding = false;
         ClearAttackSlow();
@@ -129,6 +161,23 @@ public sealed class WasdBlockMovement : MonoBehaviour
     private void Update()
     {
         dashedThisFrame = false;
+        if (knockbackTimeLeft > 0f)
+        {
+            float before = knockbackTimeLeft / KnockbackDuration;
+            knockbackTimeLeft = Mathf.Max(0f, knockbackTimeLeft - Time.deltaTime);
+            float after = knockbackTimeLeft / KnockbackDuration;
+            float distance = KnockbackDistance * (before * before - after * after);
+            int steps = Mathf.CeilToInt(distance / 0.2f);
+            for (int i = 0; i < steps; i++)
+            {
+                if (!TryMove(knockbackDirection * (distance / steps), false))
+                {
+                    knockbackTimeLeft = 0f;
+                    break;
+                }
+            }
+            return;
+        }
         if (dashTimeLeft > 0f)
         {
             AdvanceDash();
@@ -158,7 +207,12 @@ public sealed class WasdBlockMovement : MonoBehaviour
 #if ENABLE_INPUT_SYSTEM || ENABLE_LEGACY_INPUT_MANAGER
         float x = (right ? 1f : 0f) - (left ? 1f : 0f);
         float z = (forward ? 1f : 0f) - (backward ? 1f : 0f);
-        var direction = new Vector3(x, 0f, z).normalized;
+        var view = Camera.main;
+        var screenRight = view != null
+            ? Vector3.ProjectOnPlane(view.transform.right, Vector3.up).normalized
+            : Vector3.right;
+        var screenForward = Vector3.Cross(screenRight, Vector3.up);
+        var direction = (screenRight * x + screenForward * z).normalized;
         if (direction == Vector3.zero)
             return;
 
@@ -209,9 +263,9 @@ public sealed class WasdBlockMovement : MonoBehaviour
         }
     }
 
-    private bool TryMove(Vector3 offset)
+    private bool TryMove(Vector3 offset, bool faceMovement = true)
     {
-        if (characterVisual != null && offset.sqrMagnitude > 0f)
+        if (faceMovement && characterVisual != null && offset.sqrMagnitude > 0f)
             targetRotation = Quaternion.LookRotation(offset, Vector3.up);
 
         Vector3 nextPosition = ClampToMovementBoundary(transform.position + offset);
@@ -226,7 +280,7 @@ public sealed class WasdBlockMovement : MonoBehaviour
         return true;
     }
 
-    private bool TryGetGroundHeight(Vector3 position, out float height)
+    internal bool TryGetGroundHeight(Vector3 position, out float height)
     {
         height = position.y;
         if (walkableGround == null || walkableGround.Length == 0)

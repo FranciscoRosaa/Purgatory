@@ -5,8 +5,8 @@ using UnityEngine.Rendering;
 // The wave stays at the cast origin while the player can continue moving.
 public sealed class PlayerAreaWave : MonoBehaviour
 {
-    private readonly HashSet<LungeMan> hitEnemies = new HashSet<LungeMan>();
-    private LungeMan[] candidates;
+    private readonly HashSet<CombatEnemy> hitEnemies = new HashSet<CombatEnemy>();
+    private CombatEnemy[] candidates;
     private AreaWavePresentation presentation;
     private float startedAt, duration, radius, heightDifference;
     private float vfxSpeed;
@@ -29,7 +29,7 @@ public sealed class PlayerAreaWave : MonoBehaviour
         wave.applyDamage = applyDamage;
         wave.vfxSpeed = Mathf.Max(0.1f, vfxSpeed);
         wave.startedAt = Time.time - Mathf.Clamp01(progress) * wave.duration;
-        wave.candidates = applyDamage ? Object.FindObjectsByType<LungeMan>() : null;
+        wave.candidates = applyDamage ? Object.FindObjectsByType<CombatEnemy>() : null;
         wave.presentation = new AreaWavePresentation(root.transform, template);
         wave.Advance(Time.time);
         return wave;

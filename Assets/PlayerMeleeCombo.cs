@@ -73,6 +73,7 @@ public sealed class PlayerMeleeCombo : MonoBehaviour
     private int nextStrike;
     private bool recovering;
     private bool damageApplied;
+    private bool swingSoundPlayed;
     private float nextAllowedAttack;
     private float nextAllowedAreaAttack;
     private bool areaAttacking;
@@ -145,6 +146,12 @@ public sealed class PlayerMeleeCombo : MonoBehaviour
         var timing = strike == 0 ? swingA : strike == 1 ? swingB : swingC;
         bool isSwinging = state.fullPathHash == StrikeStates[strike];
         float time = state.normalizedTime;
+        if (isSwinging && time >= timing.Start && !swingSoundPlayed)
+        {
+            swingSoundPlayed = true;
+            CombatAudio.Swing(transform.position, strike);
+            session?.RegisterMeleeSwing(strike);
+        }
         bool impact = isSwinging && time >= timing.Impact;
         if (impact && !damageApplied)
         {
@@ -153,8 +160,8 @@ public sealed class PlayerMeleeCombo : MonoBehaviour
             {
                 if (session != null && session.InMatch && !session.IsHost)
                     session.QueueMeleeStrike(animator.transform.forward, strike);
-                else
-                    ApplyMeleeAttack(transform.position, animator.transform.forward, strike);
+                else if (ApplyMeleeAttack(transform.position, animator.transform.forward, strike))
+                    session?.RegisterMeleeHit(strike);
             }
         }
 
@@ -170,21 +177,29 @@ public sealed class PlayerMeleeCombo : MonoBehaviour
 
     private void OnDestroy() => presentation?.Dispose();
 
-    internal void ApplyMeleeAttack(Vector3 position, Vector3 forward, int attackIndex)
+    internal bool ApplyMeleeAttack(Vector3 position, Vector3 forward, int attackIndex)
     {
         if (attackIndex < 0 || attackIndex >= StrikeCount)
-            return;
-        SelectMeleeTarget(position, forward, meleeRadius, maxTargetHeightDifference)?.ApplyMeleeStrike(attackIndex);
+            return false;
+        var target = SelectMeleeTarget(position, forward, meleeRadius, maxTargetHeightDifference);
+        if (target == null)
+            return false;
+        int previousHealth = target.Health;
+        target.ApplyMeleeStrike(attackIndex);
+        if (target.Health == previousHealth)
+            return false;
+        CombatAudio.Hit(target.transform.position, attackIndex);
+        return true;
     }
 
-    internal static LungeMan SelectMeleeTarget(Vector3 position, Vector3 forward, float radius, float heightDifference)
+    internal static CombatEnemy SelectMeleeTarget(Vector3 position, Vector3 forward, float radius, float heightDifference)
     {
         forward.y = 0f;
         forward = forward.sqrMagnitude > 0.0001f ? forward.normalized : Vector3.forward;
-        LungeMan best = null;
+        CombatEnemy best = null;
         float bestAlignment = float.NegativeInfinity;
         float bestDistance = float.PositiveInfinity;
-        foreach (var candidate in Object.FindObjectsByType<LungeMan>())
+        foreach (var candidate in Object.FindObjectsByType<CombatEnemy>())
         {
             if (!IsInAttackArea(candidate, position, radius, heightDifference))
                 continue;
@@ -203,7 +218,7 @@ public sealed class PlayerMeleeCombo : MonoBehaviour
         return best;
     }
 
-    internal static bool IsInAttackArea(LungeMan enemy, Vector3 center, float radius, float heightDifference)
+    internal static bool IsInAttackArea(CombatEnemy enemy, Vector3 center, float radius, float heightDifference)
     {
         if (enemy == null || !enemy.isActiveAndEnabled || enemy.Health <= 0)
             return false;
@@ -236,10 +251,14 @@ public sealed class PlayerMeleeCombo : MonoBehaviour
         return true;
     }
 
-    internal PlayerAreaWave SpawnAreaWave(Vector3 origin, bool applyDamage, float progress = 0f) =>
-        PlayerAreaWave.Spawn(origin, AreaRadius, AreaDuration, areaDamage, maxTargetHeightDifference,
+    internal PlayerAreaWave SpawnAreaWave(Vector3 origin, bool applyDamage, float progress = 0f)
+    {
+        if (progress * AreaDuration < 0.35f)
+            CombatAudio.Shout(origin);
+        return PlayerAreaWave.Spawn(origin, AreaRadius, AreaDuration, areaDamage, maxTargetHeightDifference,
             areaVfxMaterial != null ? areaVfxMaterial : movement.WindMaterial,
             applyDamage, progress, Mathf.Max(0.1f, areaVfxSpeed));
+    }
 
     internal void PlayAreaAnimation(Animator target, float progress = 0f)
     {
@@ -326,6 +345,7 @@ public sealed class PlayerMeleeCombo : MonoBehaviour
         nextAllowedAttack = now + AttackCooldown;
         recovering = false;
         damageApplied = false;
+        swingSoundPlayed = false;
         animator.Play(StrikeStates[strike], 0, 0f);
         movement.FlashMelee();
         presentation?.Begin(strike == StrikeCount - 1);

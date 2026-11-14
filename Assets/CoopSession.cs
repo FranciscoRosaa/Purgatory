@@ -21,9 +21,9 @@ internal sealed class CoopSession : MonoBehaviour
     private const byte PositionMessage = 1;
     private const byte SnapshotMessage = 2;
     private const int SnapshotHeaderBytes = 8;
-    private const int PlayerBytes = 24;
-    private const int PositionBytes = 46;
-    private const int CombatSnapshotBytes = 82;
+    private const int PlayerBytes = 27;
+    private const int PositionBytes = 47;
+    private const int CombatSnapshotBytes = 118 + 63 + 40;
     private const float RemoteDodgeGrace = 0.15f;
     private const float MeleePacketSlack = 0.10f;
     private const byte NoDash = byte.MaxValue;
@@ -35,6 +35,7 @@ internal sealed class CoopSession : MonoBehaviour
         public uint LastSequence;
         public byte Appearance;
         public byte MeleeFlash;
+        public byte MeleeSwingAudio, MeleeHitAudio;
         public int Health = GameplayHud.StartingHealth;
         public uint LastMelee;
         public float NextMelee;
@@ -50,6 +51,9 @@ internal sealed class CoopSession : MonoBehaviour
         public float LungeContact;
         public bool HitInLane, DodgedLunge;
         public uint DodgeSequence;
+        public uint LastGiantSprint;
+        public byte SprintHit;
+        public Vector3 SprintPush;
     }
 
     private sealed class Avatar
@@ -59,6 +63,8 @@ internal sealed class CoopSession : MonoBehaviour
         public byte MeleeFlash;
         public CharacterWhiteFlash WhiteFlash;
         public uint AreaSequence;
+        public byte SprintHit;
+        public byte MeleeSwingAudio, MeleeHitAudio;
     }
 
     private readonly Dictionary<NetworkConnection, Peer> peers = new Dictionary<NetworkConnection, Peer>();
@@ -71,6 +77,8 @@ internal sealed class CoopSession : MonoBehaviour
     private GameplayHud gameplayHud;
     private LungeMan lungeMan;
     private GiantChargeAttack giant;
+    private RedNinja ninja;
+    private TrueHealer healer;
     private Task authentication;
     private string pendingInvite;
     private bool hosting, busy, started, previousRunInBackground;
@@ -82,6 +90,8 @@ internal sealed class CoopSession : MonoBehaviour
     private float meleeYaw;
     private byte meleeStrike;
     private byte meleeImpactFlash;
+    private byte localSprintHit, lastSprintHit;
+    private byte localMeleeSwingAudio, localMeleeHitAudio, lastLocalHitAudio;
 
     internal bool IsHost => driver.IsCreated && hosting;
     internal bool InMatch => started && driver.IsCreated;
@@ -229,6 +239,8 @@ internal sealed class CoopSession : MonoBehaviour
         gameplayHud = FindAnyObjectByType<GameplayHud>();
         lungeMan = FindAnyObjectByType<LungeMan>();
         giant = FindAnyObjectByType<GiantChargeAttack>();
+        ninja = FindAnyObjectByType<RedNinja>();
+        healer = FindAnyObjectByType<TrueHealer>();
         Vector2 spawn = Spawn(localId);
         localBlock.position = new Vector3(spawn.x, localBlock.position.y, spawn.y);
     }
@@ -362,6 +374,7 @@ internal sealed class CoopSession : MonoBehaviour
         writer.WriteUInt(localMelee != null ? localMelee.AreaAttackSequence : 0u);
         Vector3 areaOrigin = localMelee != null ? localMelee.AreaAttackOrigin : Vector3.zero;
         WritePosition(ref writer, new Vector2(areaOrigin.x, areaOrigin.z));
+        writer.WriteByte(localMeleeSwingAudio);
         driver.EndSend(writer);
     }
 
@@ -383,6 +396,7 @@ internal sealed class CoopSession : MonoBehaviour
         var dashOrigin = ReadPosition(ref reader);
         uint areaSequence = reader.ReadUInt();
         var areaOrigin = ReadPosition(ref reader);
+        byte swingAudio = reader.ReadByte();
         if (positionSequence <= peer.LastSequence || !Valid(position) || appearance >= CharacterProfiles.AppearanceCount)
             return;
         peer.LastSequence = positionSequence;
@@ -397,6 +411,11 @@ internal sealed class CoopSession : MonoBehaviour
             }
             peer.Position = position;
             RecordPeerDash(peer, dashAge, dashOrigin, position, now);
+            if (peer.Health > 0 && swingAudio != peer.MeleeSwingAudio && ValidMeleeAudio(swingAudio))
+            {
+                peer.MeleeSwingAudio = swingAudio;
+                CombatAudio.Swing(PlayerSoundPosition(position), swingAudio & 3);
+            }
             if (meleeFlash != peer.MeleeFlash)
             {
                 // Validate the attack start independently of the different clip impact times.
@@ -411,8 +430,9 @@ internal sealed class CoopSession : MonoBehaviour
                 {
                     peer.MeleeArmed = false;
                     if (peer.Health > 0 && localMelee != null && now >= peer.AreaStartedAt + localMelee.AreaDuration &&
-                        strike < PlayerMeleeCombo.StrikeCount && Mathf.Abs(yaw) <= 360f)
-                        localMelee.ApplyMeleeAttack(ToWorld(position), Quaternion.Euler(0f, yaw, 0f) * Vector3.forward, strike);
+                        strike < PlayerMeleeCombo.StrikeCount && Mathf.Abs(yaw) <= 360f &&
+                        localMelee.ApplyMeleeAttack(ToWorld(position), Quaternion.Euler(0f, yaw, 0f) * Vector3.forward, strike))
+                        peer.MeleeHitAudio = NextMeleeAudio(peer.MeleeHitAudio, strike);
                 }
             }
             if (areaSequence > peer.LastAreaRequest)
@@ -435,7 +455,8 @@ internal sealed class CoopSession : MonoBehaviour
         }
         peer.MeleeFlash = meleeFlash;
         if (localBlock != null)
-            SetAvatar(peer.Id, position, appearance, meleeFlash, peer.AreaSequence, peer.AreaOrigin, AreaProgress(peer));
+            SetAvatar(peer.Id, position, appearance, meleeFlash, peer.AreaSequence, peer.AreaOrigin,
+                AreaProgress(peer), peer.SprintHit);
     }
 
     private void Broadcast()
@@ -454,14 +475,19 @@ internal sealed class CoopSession : MonoBehaviour
                 localMovement != null ? localMovement.MeleeFlashSequence : (byte)0,
                 localMelee != null ? localMelee.AreaAttackSequence : 0u,
                 localMelee != null ? localMelee.AreaAttackOrigin : Vector3.zero,
-                localMelee != null ? localMelee.AreaAttackProgress : 1f);
+                localMelee != null ? localMelee.AreaAttackProgress : 1f, localSprintHit,
+                localMeleeSwingAudio, localMeleeHitAudio);
             foreach (var peer in peers.Values)
                 WritePlayer(ref writer, peer.Id, peer.Position, peer.Appearance, peer.MeleeFlash,
-                    peer.AreaSequence, peer.AreaOrigin, AreaProgress(peer));
+                    peer.AreaSequence, peer.AreaOrigin, AreaProgress(peer), peer.SprintHit,
+                    peer.MeleeSwingAudio, peer.MeleeHitAudio);
             writer.WriteInt(recipient.Value.Health);
             writer.WriteUInt(recipient.Value.DodgeSequence);
+            writer.WriteFloat(Mathf.Atan2(recipient.Value.SprintPush.x, recipient.Value.SprintPush.z));
             WriteEnemy(ref writer, lungeMan != null ? lungeMan.GetState() : default);
             WriteGiant(ref writer, giant != null ? giant.GetState() : default);
+            WriteNinja(ref writer, ninja != null ? ninja.GetState() : default);
+            WriteHealer(ref writer, healer != null ? healer.GetState() : default);
             driver.EndSend(writer);
         }
     }
@@ -491,6 +517,7 @@ internal sealed class CoopSession : MonoBehaviour
             return;
 
         int present = 0;
+        byte sprintHit = lastSprintHit;
         for (int i = 0; i < count; i++)
         {
             byte id = reader.ReadByte();
@@ -501,10 +528,27 @@ internal sealed class CoopSession : MonoBehaviour
             var areaOrigin = ToWorld(ReadPosition(ref reader));
             areaOrigin.y = localBlock.position.y;
             float areaProgress = reader.ReadByte() / 255f;
+            byte hit = reader.ReadByte();
+            byte swingAudio = reader.ReadByte();
+            byte hitAudio = reader.ReadByte();
+            if (id == localId)
+            {
+                sprintHit = hit;
+                if (hitAudio != lastLocalHitAudio && ValidMeleeAudio(hitAudio))
+                    CombatAudio.Hit(PlayerSoundPosition(position), hitAudio & 3);
+                lastLocalHitAudio = hitAudio;
+            }
             if (id < 1 || id > MaxPlayers || id == localId || !Valid(position) || appearance >= CharacterProfiles.AppearanceCount)
                 continue;
             present |= 1 << id;
-            SetAvatar(id, position, appearance, meleeFlash, areaSequence, areaOrigin, areaProgress);
+            SetAvatar(id, position, appearance, meleeFlash, areaSequence, areaOrigin, areaProgress, hit);
+            var avatar = avatars[id];
+            if (swingAudio != avatar.MeleeSwingAudio && ValidMeleeAudio(swingAudio))
+                CombatAudio.Swing(avatar.Object.transform.position, swingAudio & 3);
+            if (hitAudio != avatar.MeleeHitAudio && ValidMeleeAudio(hitAudio))
+                CombatAudio.Hit(avatar.Object.transform.position, hitAudio & 3);
+            avatar.MeleeSwingAudio = swingAudio;
+            avatar.MeleeHitAudio = hitAudio;
         }
         for (byte id = 1; id <= MaxPlayers; id++)
             if ((present & (1 << id)) == 0)
@@ -518,10 +562,20 @@ internal sealed class CoopSession : MonoBehaviour
             lastDodge = dodge;
             gameplayHud?.ShowPerfectDodge(localBlock);
         }
+        float pushAngle = reader.ReadFloat();
+        if (sprintHit != lastSprintHit)
+        {
+            lastSprintHit = sprintHit;
+            localMovement?.ApplySprintKnockback(new Vector3(Mathf.Sin(pushAngle), 0f, Mathf.Cos(pushAngle)));
+        }
         var enemyState = ReadEnemy(ref reader);
         lungeMan?.ApplyState(enemyState);
         var giantState = ReadGiant(ref reader);
         giant?.ApplyState(giantState);
+        var ninjaState = ReadNinja(ref reader);
+        ninja?.ApplyState(ninjaState);
+        var healerState = ReadHealer(ref reader);
+        healer?.ApplyState(healerState);
     }
 
     internal void QueueMeleeStrike(Vector3 forward, int strike)
@@ -532,11 +586,27 @@ internal sealed class CoopSession : MonoBehaviour
         meleeSequence++;
     }
 
-    internal void FindNearestLivingPeer(Vector3 origin, ref Vector3 target, ref float bestDistance)
+    internal void RegisterMeleeSwing(int strike) =>
+        localMeleeSwingAudio = NextMeleeAudio(localMeleeSwingAudio, strike);
+
+    internal void RegisterMeleeHit(int strike) =>
+        localMeleeHitAudio = NextMeleeAudio(localMeleeHitAudio, strike);
+
+    // Two bits identify the strike. The upper bits let snapshots deliver each sound once.
+    private static byte NextMeleeAudio(byte previous, int strike) =>
+        (byte)(((previous >> 2) % 63 + 1) << 2 | strike);
+
+    private static bool ValidMeleeAudio(byte cue) => cue != 0 && (cue & 3) < PlayerMeleeCombo.StrikeCount;
+
+    private Vector3 PlayerSoundPosition(Vector2 position) =>
+        new Vector3(position.x, localBlock != null ? localBlock.position.y : 0f, position.y);
+
+    internal byte FindNearestLivingPeer(Vector3 origin, ref Vector3 target, ref float bestDistance)
     {
         if (!InMatch || !IsHost)
-            return;
+            return 0;
 
+        byte nearestPeer = 0;
         var originXZ = new Vector2(origin.x, origin.z);
         foreach (var peer in peers.Values)
         {
@@ -546,7 +616,23 @@ internal sealed class CoopSession : MonoBehaviour
 
             target = ToWorld(peer.Position);
             bestDistance = distance;
+            nearestPeer = peer.Id;
         }
+        return nearestPeer;
+    }
+
+    internal bool TryGetLivingPeerPosition(byte id, out Vector3 position)
+    {
+        foreach (var peer in peers.Values)
+        {
+            if (peer.Id == id && peer.Health > 0)
+            {
+                position = ToWorld(peer.Position);
+                return true;
+            }
+        }
+        position = default;
+        return false;
     }
 
     private void RecordPeerDash(Peer peer, byte age, Vector2 origin, Vector2 end, float now)
@@ -605,7 +691,152 @@ internal sealed class CoopSession : MonoBehaviour
         }
     }
 
+    internal void RegisterLocalSprintHit() => localSprintHit++;
+
+    internal void ResolvePeersInGiantSprint(GiantChargeAttack enemy, uint sprint, Vector3 start, Vector3 end)
+    {
+        if (!InMatch || !IsHost)
+            return;
+
+        foreach (var peer in peers.Values)
+        {
+            if (peer.Health <= 0 || peer.LastGiantSprint == sprint)
+                continue;
+
+            var point = ToWorld(peer.Position);
+            point.y = localBlock != null ? localBlock.position.y : start.y;
+            if (!enemy.TrySprintContact(start, end, point, out var push))
+                continue;
+
+            peer.LastGiantSprint = sprint;
+            if (TryRegisterPeerDodge(peer))
+                continue;
+
+            peer.SprintHit++;
+            peer.SprintPush = push;
+            peer.Health = Mathf.Max(0, peer.Health - GiantChargeAttack.SprintDamage);
+            if (avatars.TryGetValue(peer.Id, out var avatar))
+            {
+                avatar.SprintHit = peer.SprintHit;
+                avatar.WhiteFlash.Pulse();
+            }
+        }
+    }
+
     private static Vector3 ToWorld(Vector2 position) => new Vector3(position.x, 0f, position.y);
+
+    internal void ResolvePeersInGiantJump(GiantChargeAttack enemy)
+    {
+        if (!InMatch || !IsHost || localBlock == null)
+            return;
+
+        foreach (var peer in peers.Values)
+        {
+            if (peer.Health <= 0)
+                continue;
+
+            var position = ToWorld(peer.Position);
+            position.y = localBlock.position.y;
+            if (enemy.IsInJumpSquare(position) && !TryRegisterPeerDodge(peer))
+                peer.Health = Mathf.Max(0, peer.Health - GiantChargeAttack.JumpDamage);
+        }
+    }
+
+    internal bool TryResolvePeerFireContact(Vector3 start, Vector3 end, float localFraction, out float fraction)
+    {
+        fraction = localFraction;
+        if (!InMatch || !IsHost || localBlock == null)
+            return false;
+
+        Peer target = null;
+        foreach (var peer in peers.Values)
+        {
+            if (peer.Health <= 0)
+                continue;
+            var feet = ToWorld(peer.Position);
+            feet.y = localBlock.position.y;
+            if (localMovement != null && localMovement.TryGetGroundHeight(feet, out float ground))
+                feet.y = ground;
+            float contact = RedNinja.ContactFraction(start, end, feet);
+            if (contact >= fraction)
+                continue;
+            target = peer;
+            fraction = contact;
+        }
+        if (target == null)
+            return false;
+        if (!TryRegisterPeerDodge(target))
+            target.Health = Mathf.Max(0, target.Health - RedNinja.FireDamage);
+        return true;
+    }
+
+    private bool TryRegisterPeerDodge(Peer peer)
+    {
+        float dashAge = Time.time - peer.DashStartedAt;
+        if (localMovement == null || dashAge < 0f || dashAge > localMovement.DashDuration)
+            return false;
+
+        peer.DodgeSequence++;
+        return true;
+    }
+
+    private static void WriteNinja(ref DataStreamWriter writer, RedNinja.State state)
+    {
+        writer.WriteByte((byte)state.Phase);
+        WriteVector(ref writer, state.Position);
+        writer.WriteFloat(state.Yaw);
+        writer.WriteFloat(state.Elapsed);
+        writer.WriteByte((byte)state.Health);
+        writer.WriteUInt(state.HitSequence);
+        writer.WriteULong(state.HitHistory);
+        writer.WriteUInt(state.ShotSequence);
+        writer.WriteByte((byte)state.Fire);
+        WriteVector(ref writer, state.FirePosition);
+        WriteVector(ref writer, state.FireDirection);
+    }
+
+    private static RedNinja.State ReadNinja(ref DataStreamReader reader) => new RedNinja.State
+    {
+        Phase = (RedNinja.Phase)reader.ReadByte(),
+        Position = ReadVector(ref reader),
+        Yaw = reader.ReadFloat(),
+        Elapsed = reader.ReadFloat(),
+        Health = reader.ReadByte(),
+        HitSequence = reader.ReadUInt(),
+        HitHistory = reader.ReadULong(),
+        ShotSequence = reader.ReadUInt(),
+        Fire = (RedNinja.FireStatus)reader.ReadByte(),
+        FirePosition = ReadVector(ref reader),
+        FireDirection = ReadVector(ref reader)
+    };
+
+    private static void WriteHealer(ref DataStreamWriter writer, TrueHealer.State state)
+    {
+        writer.WriteByte((byte)state.Phase);
+        WriteVector(ref writer, state.Position);
+        writer.WriteFloat(state.Yaw);
+        writer.WriteFloat(state.Elapsed);
+        writer.WriteByte((byte)state.Health);
+        writer.WriteUInt(state.HitSequence);
+        writer.WriteULong(state.HitHistory);
+        writer.WriteUInt(state.HealSequence);
+        writer.WriteByte((byte)state.Recipient);
+        writer.WriteByte(state.RestoredHealth);
+    }
+
+    private static TrueHealer.State ReadHealer(ref DataStreamReader reader) => new TrueHealer.State
+    {
+        Phase = (TrueHealer.Phase)reader.ReadByte(),
+        Position = ReadVector(ref reader),
+        Yaw = reader.ReadFloat(),
+        Elapsed = reader.ReadFloat(),
+        Health = reader.ReadByte(),
+        HitSequence = reader.ReadUInt(),
+        HitHistory = reader.ReadULong(),
+        HealSequence = reader.ReadUInt(),
+        Recipient = (TrueHealer.HealRecipient)reader.ReadByte(),
+        RestoredHealth = reader.ReadByte()
+    };
 
     private static void WriteGiant(ref DataStreamWriter writer, GiantChargeAttack.State state)
     {
@@ -613,6 +844,11 @@ internal sealed class CoopSession : MonoBehaviour
         WriteVector(ref writer, state.Position);
         writer.WriteFloat(state.Yaw);
         writer.WriteFloat(state.Progress);
+        writer.WriteInt(state.Health);
+        writer.WriteUInt(state.HitSequence);
+        writer.WriteULong(state.HitHistory);
+        WriteVector(ref writer, state.JumpTarget);
+        writer.WriteUInt(state.JumpImpact);
     }
 
     private static GiantChargeAttack.State ReadGiant(ref DataStreamReader reader) => new GiantChargeAttack.State
@@ -620,7 +856,12 @@ internal sealed class CoopSession : MonoBehaviour
         Phase = (GiantChargeAttack.Phase)reader.ReadByte(),
         Position = ReadVector(ref reader),
         Yaw = reader.ReadFloat(),
-        Progress = reader.ReadFloat()
+        Progress = reader.ReadFloat(),
+        Health = reader.ReadInt(),
+        HitSequence = reader.ReadUInt(),
+        HitHistory = reader.ReadULong(),
+        JumpTarget = ReadVector(ref reader),
+        JumpImpact = reader.ReadUInt()
     };
 
     private static void WriteEnemy(ref DataStreamWriter writer, LungeMan.State state)
@@ -663,7 +904,7 @@ internal sealed class CoopSession : MonoBehaviour
         Mathf.Clamp01((Time.time - peer.AreaStartedAt) / localMelee.AreaDuration);
 
     private void SetAvatar(byte id, Vector2 position, byte appearance, byte meleeFlash,
-        uint areaSequence, Vector3 areaOrigin, float areaProgress)
+        uint areaSequence, Vector3 areaOrigin, float areaProgress, byte sprintHit)
     {
         bool created = false;
         if (!avatars.TryGetValue(id, out var avatar))
@@ -684,6 +925,11 @@ internal sealed class CoopSession : MonoBehaviour
         if (avatar.MeleeFlash != meleeFlash)
         {
             avatar.MeleeFlash = meleeFlash;
+            avatar.WhiteFlash.Pulse();
+        }
+        if (avatar.SprintHit != sprintHit)
+        {
+            avatar.SprintHit = sprintHit;
             avatar.WhiteFlash.Pulse();
         }
         if (avatar.AreaSequence != areaSequence)
@@ -716,7 +962,7 @@ internal sealed class CoopSession : MonoBehaviour
     }
 
     private static void WritePlayer(ref DataStreamWriter writer, byte id, Vector2 position, byte appearance, byte meleeFlash,
-        uint areaSequence, Vector3 areaOrigin, float areaProgress)
+        uint areaSequence, Vector3 areaOrigin, float areaProgress, byte sprintHit, byte swingAudio, byte hitAudio)
     {
         writer.WriteByte(id);
         WritePosition(ref writer, position);
@@ -725,6 +971,9 @@ internal sealed class CoopSession : MonoBehaviour
         writer.WriteUInt(areaSequence);
         WritePosition(ref writer, new Vector2(areaOrigin.x, areaOrigin.z));
         writer.WriteByte((byte)Mathf.Clamp(Mathf.RoundToInt(areaProgress * 255f), 0, 255));
+        writer.WriteByte(sprintHit);
+        writer.WriteByte(swingAudio);
+        writer.WriteByte(hitAudio);
     }
 
     private static void WritePosition(ref DataStreamWriter writer, Vector2 position)
@@ -782,10 +1031,14 @@ internal sealed class CoopSession : MonoBehaviour
         gameplayHud = null;
         lungeMan = null;
         giant = null;
+        ninja = null;
+        healer = null;
         meleeSequence = 0;
         meleeYaw = 0f;
         meleeStrike = 0;
         meleeImpactFlash = 0;
+        localSprintHit = lastSprintHit = 0;
+        localMeleeSwingAudio = localMeleeHitAudio = lastLocalHitAudio = 0;
     }
 
     private void OnDestroy() => Close();
