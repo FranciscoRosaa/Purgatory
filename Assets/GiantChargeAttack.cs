@@ -87,6 +87,13 @@ public sealed class GiantChargeAttack : CombatEnemy
     internal float ChargeDuration => Mathf.Max(0.05f, chargeDuration);
     internal bool IsCharging => phase == Phase.Charge;
 
+    internal override void ConfigureForWave(WasdBlockMovement source)
+    {
+        if (source == null) return;
+        walkableGround = source.WalkableGround;
+        movementBoundary = source.MovementBoundary;
+    }
+
     private void Start()
     {
         if (visual == null || animator == null || !animator.isHuman ||

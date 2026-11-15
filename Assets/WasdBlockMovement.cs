@@ -41,6 +41,8 @@ public sealed class WasdBlockMovement : MonoBehaviour
     internal bool UsesDashGrounding { get; private set; }
     internal bool IsDodging => dashTimeLeft > 0f || dashedThisFrame || UsesDashGrounding;
     internal Material WindMaterial => dashWindMaterial;
+    internal Collider[] WalkableGround => walkableGround;
+    internal BoxCollider MovementBoundary => movementBoundary;
     internal byte MeleeFlashSequence { get; private set; }
     internal float DashReach => dashSpeed * dashDuration;
     internal float DashDuration => dashDuration;

@@ -35,6 +35,7 @@ public sealed class TrueHealer : CombatEnemy
         internal ulong HitHistory;
         internal HealRecipient Recipient;
         internal byte RestoredHealth;
+        internal ushort RecipientId;
     }
 
     private WasdBlockMovement player;
@@ -62,6 +63,8 @@ public sealed class TrueHealer : CombatEnemy
     private ulong hitHistory;
     private HealRecipient recipient;
     private byte restoredHealth;
+    private ushort recipientId;
+    private float nextAllyRefresh;
 
     internal override int Health { get; private protected set; } = MaxHealth;
     internal override int HealthLimit => MaxHealth;
@@ -196,6 +199,11 @@ public sealed class TrueHealer : CombatEnemy
 
     private CombatEnemy FindAlly()
     {
+        if (Time.time >= nextAllyRefresh)
+        {
+            allies = FindObjectsByType<CombatEnemy>();
+            nextAllyRefresh = Time.time + 0.25f;
+        }
         CombatEnemy closest = null, wounded = null;
         float closestDistance = float.PositiveInfinity, woundedDistance = float.PositiveInfinity;
         foreach (var ally in allies)
@@ -270,6 +278,7 @@ public sealed class TrueHealer : CombatEnemy
                 if (restored > 0)
                 {
                     recipient = Identify(healTarget);
+                    recipientId = healTarget.WaveSpawnId;
                     restoredHealth = (byte)restored;
                     healSequence++;
                 }
@@ -327,11 +336,13 @@ public sealed class TrueHealer : CombatEnemy
             Animate();
         if (shownHeal != healSequence)
         {
-            shownHeal = healSequence;
-            var target = recipient == HealRecipient.Self ? this
-                : !IsReplica ? healTarget : System.Array.Find(allies, ally => ally != null && Identify(ally) == recipient);
+            var target = !IsReplica ? healTarget : recipientId != 0
+                ? FindAnyObjectByType<WaveDirector>()?.FindEnemy(recipientId)
+                : recipient == HealRecipient.Self ? this
+                : System.Array.Find(allies, ally => ally != null && Identify(ally) == recipient);
             if (target != null)
             {
+                shownHeal = healSequence;
                 float labelHeight = effects.Heal(target.transform);
                 feedback?.ShowHeal(target.transform, labelHeight, restoredHealth);
             }
@@ -382,7 +393,7 @@ public sealed class TrueHealer : CombatEnemy
     {
         Phase = phase, Position = transform.position, Yaw = transform.eulerAngles.y, Elapsed = Age,
         Health = Health, HitSequence = hitSequence, HitHistory = hitHistory,
-        HealSequence = healSequence, Recipient = recipient, RestoredHealth = restoredHealth
+        HealSequence = healSequence, Recipient = recipient, RestoredHealth = restoredHealth, RecipientId = recipientId
     };
 
     internal void ApplyState(State state)
@@ -403,6 +414,7 @@ public sealed class TrueHealer : CombatEnemy
         healSequence = state.HealSequence;
         recipient = state.Recipient;
         restoredHealth = state.RestoredHealth;
+        recipientId = state.RecipientId;
     }
 
     private void OnDestroy()

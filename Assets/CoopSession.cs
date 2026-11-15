@@ -11,7 +11,7 @@ using Unity.Services.Relay.Models;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
-internal sealed class CoopSession : MonoBehaviour
+internal sealed partial class CoopSession : MonoBehaviour
 {
     internal const string GameScene = "Assets/Scenes/SampleScene.unity";
     private const string MenuScene = "Assets/Scenes/MainMenu.unity";
@@ -23,7 +23,7 @@ internal sealed class CoopSession : MonoBehaviour
     private const int SnapshotHeaderBytes = 8;
     private const int PlayerBytes = 27;
     private const int PositionBytes = 47;
-    private const int CombatSnapshotBytes = 118 + 63 + 40;
+    private const int CombatSnapshotBytes = 118 + 63 + 42;
     private const float RemoteDodgeGrace = 0.15f;
     private const float MeleePacketSlack = 0.10f;
     private const byte NoDash = byte.MaxValue;
@@ -46,12 +46,9 @@ internal sealed class CoopSession : MonoBehaviour
         public Vector3 AreaOrigin;
         public Vector3 DashOrigin, DashEnd;
         public float DashStartedAt = float.NegativeInfinity;
-        public LungeMan PendingLunge;
-        public LungeMan.AttackLane PendingLane;
-        public float LungeContact;
-        public bool HitInLane, DodgedLunge;
+        public readonly List<PendingLungeHit> PendingLunges = new List<PendingLungeHit>();
         public uint DodgeSequence;
-        public uint LastGiantSprint;
+        public readonly Dictionary<GiantChargeAttack, uint> LastGiantSprints = new Dictionary<GiantChargeAttack, uint>();
         public byte SprintHit;
         public Vector3 SprintPush;
     }
@@ -241,6 +238,7 @@ internal sealed class CoopSession : MonoBehaviour
         giant = FindAnyObjectByType<GiantChargeAttack>();
         ninja = FindAnyObjectByType<RedNinja>();
         healer = FindAnyObjectByType<TrueHealer>();
+        waveDirector = FindAnyObjectByType<WaveDirector>();
         Vector2 spawn = Spawn(localId);
         localBlock.position = new Vector3(spawn.x, localBlock.position.y, spawn.y);
     }
@@ -278,7 +276,7 @@ internal sealed class CoopSession : MonoBehaviour
         if (IsHost)
             AcceptPlayers();
 
-        for (int i = 0; i < 64; i++)
+        for (int i = 0; i < 256; i++)
         {
             var kind = driver.PopEvent(out var connection, out var reader);
             if (kind == NetworkEvent.Type.Empty)
@@ -299,7 +297,11 @@ internal sealed class CoopSession : MonoBehaviour
                 if (IsHost)
                     ReceivePosition(connection, reader);
                 else if (connection == server)
-                    ReceiveSnapshot(reader);
+                {
+                    var prefix = reader;
+                    if (prefix.Length > 0 && prefix.ReadByte() == WaveEnemyMessage) ReceiveWaveEnemy(reader);
+                    else ReceiveSnapshot(reader);
+                }
             }
         }
 
@@ -464,7 +466,7 @@ internal sealed class CoopSession : MonoBehaviour
         uint snapshotSequence = ++sequence;
         foreach (var recipient in peers)
         {
-            if (driver.BeginSend(recipient.Key, out var writer, SnapshotHeaderBytes + Count * PlayerBytes + CombatSnapshotBytes) != 0)
+            if (driver.BeginSend(recipient.Key, out var writer, SnapshotHeaderBytes + Count * PlayerBytes + CombatBytes) != 0)
                 continue;
             writer.WriteByte(SnapshotMessage);
             writer.WriteUInt(snapshotSequence);
@@ -484,12 +486,18 @@ internal sealed class CoopSession : MonoBehaviour
             writer.WriteInt(recipient.Value.Health);
             writer.WriteUInt(recipient.Value.DodgeSequence);
             writer.WriteFloat(Mathf.Atan2(recipient.Value.SprintPush.x, recipient.Value.SprintPush.z));
-            WriteEnemy(ref writer, lungeMan != null ? lungeMan.GetState() : default);
-            WriteGiant(ref writer, giant != null ? giant.GetState() : default);
-            WriteNinja(ref writer, ninja != null ? ninja.GetState() : default);
-            WriteHealer(ref writer, healer != null ? healer.GetState() : default);
+            writer.WriteByte(waveDirector != null ? (byte)1 : (byte)0);
+            if (waveDirector != null) WriteWaveSnapshot(ref writer);
+            else
+            {
+                WriteEnemy(ref writer, lungeMan != null ? lungeMan.GetState() : default);
+                WriteGiant(ref writer, giant != null ? giant.GetState() : default);
+                WriteNinja(ref writer, ninja != null ? ninja.GetState() : default);
+                WriteHealer(ref writer, healer != null ? healer.GetState() : default);
+            }
             driver.EndSend(writer);
         }
+        BroadcastWaveEnemies(snapshotSequence);
     }
 
     private void ReceiveSnapshot(DataStreamReader reader)
@@ -501,7 +509,7 @@ internal sealed class CoopSession : MonoBehaviour
         bool start = reader.ReadByte() == 1;
         int count = reader.ReadByte();
         if (count < 2 || count > MaxPlayers || assignedId < 2 || assignedId > MaxPlayers ||
-            reader.Length != SnapshotHeaderBytes + count * PlayerBytes + CombatSnapshotBytes || snapshotSequence <= lastSnapshot)
+            reader.Length < SnapshotHeaderBytes + count * PlayerBytes + 13 || snapshotSequence <= lastSnapshot)
             return;
 
         lastSnapshot = snapshotSequence;
@@ -568,6 +576,9 @@ internal sealed class CoopSession : MonoBehaviour
             lastSprintHit = sprintHit;
             localMovement?.ApplySprintKnockback(new Vector3(Mathf.Sin(pushAngle), 0f, Mathf.Cos(pushAngle)));
         }
+        byte waveMode = reader.ReadByte();
+        if (waveMode == 1) { ReadWaveSnapshot(ref reader); return; }
+        if (waveMode != 0 || reader.Length - reader.GetBytesRead() != CombatSnapshotBytes - 12) return;
         var enemyState = ReadEnemy(ref reader);
         lungeMan?.ApplyState(enemyState);
         var giantState = ReadGiant(ref reader);
@@ -644,8 +655,8 @@ internal sealed class CoopSession : MonoBehaviour
         peer.DashStartedAt = now - age * 0.001f;
         peer.DashOrigin = ToWorld(origin);
         peer.DashEnd = ToWorld(end);
-        if (peer.PendingLunge != null && now <= peer.LungeContact + RemoteDodgeGrace && TimedDodge(peer))
-            peer.DodgedLunge = true;
+        foreach (var hit in peer.PendingLunges)
+            if (now <= hit.Contact + RemoteDodgeGrace && TimedDodge(peer, hit)) hit.Dodged = true;
     }
 
     internal void DamagePeersInLane(LungeMan enemy, float contact)
@@ -659,19 +670,18 @@ internal sealed class CoopSession : MonoBehaviour
             if (peer.Health <= 0)
                 continue;
 
-            peer.PendingLunge = enemy;
-            peer.PendingLane = lane;
-            peer.LungeContact = contact;
-            peer.HitInLane = lane.Contains(ToWorld(peer.Position));
-            peer.DodgedLunge = TimedDodge(peer);
+            var hit = new PendingLungeHit { Enemy = enemy, Lane = lane, Contact = contact,
+                Hit = lane.Contains(ToWorld(peer.Position)) };
+            hit.Dodged = TimedDodge(peer, hit);
+            peer.PendingLunges.Add(hit);
         }
     }
 
-    private static bool TimedDodge(Peer peer)
+    private static bool TimedDodge(Peer peer, PendingLungeHit hit)
     {
-        float ageAtContact = peer.LungeContact - peer.DashStartedAt;
+        float ageAtContact = hit.Contact - peer.DashStartedAt;
         return ageAtContact >= -RemoteDodgeGrace && ageAtContact <= WasdBlockMovement.PerfectDodgeWindow
-            && peer.PendingLane.Intersects(peer.DashOrigin, peer.DashEnd);
+            && hit.Lane.Intersects(peer.DashOrigin, peer.DashEnd);
     }
 
     private void ResolvePeerLunges(float now)
@@ -679,15 +689,16 @@ internal sealed class CoopSession : MonoBehaviour
         // Wait briefly for position packets from players reacting to the same lunge.
         foreach (var peer in peers.Values)
         {
-            var enemy = peer.PendingLunge;
-            if (enemy == null || now < peer.LungeContact + RemoteDodgeGrace)
-                continue;
-
-            peer.PendingLunge = null;
-            if (peer.DodgedLunge)
-                peer.DodgeSequence++;
-            else if (peer.HitInLane)
-                peer.Health = Mathf.Max(0, peer.Health - enemy.RollLungeDamage());
+            for (int i = peer.PendingLunges.Count - 1; i >= 0; i--)
+            {
+                var hit = peer.PendingLunges[i];
+                if (hit.Enemy != null && now < hit.Contact + RemoteDodgeGrace) continue;
+                peer.PendingLunges.RemoveAt(i);
+                if (hit.Enemy == null) continue;
+                if (hit.Dodged) peer.DodgeSequence++;
+                else if (hit.Hit && peer.Health > 0)
+                    peer.Health = Mathf.Max(0, peer.Health - hit.Enemy.RollLungeDamage());
+            }
         }
     }
 
@@ -700,7 +711,8 @@ internal sealed class CoopSession : MonoBehaviour
 
         foreach (var peer in peers.Values)
         {
-            if (peer.Health <= 0 || peer.LastGiantSprint == sprint)
+            var giantId = enemy;
+            if (peer.Health <= 0 || (peer.LastGiantSprints.TryGetValue(giantId, out uint lastSprint) && lastSprint == sprint))
                 continue;
 
             var point = ToWorld(peer.Position);
@@ -708,7 +720,7 @@ internal sealed class CoopSession : MonoBehaviour
             if (!enemy.TrySprintContact(start, end, point, out var push))
                 continue;
 
-            peer.LastGiantSprint = sprint;
+            peer.LastGiantSprints[giantId] = sprint;
             if (TryRegisterPeerDodge(peer))
                 continue;
 
@@ -822,6 +834,7 @@ internal sealed class CoopSession : MonoBehaviour
         writer.WriteUInt(state.HealSequence);
         writer.WriteByte((byte)state.Recipient);
         writer.WriteByte(state.RestoredHealth);
+        writer.WriteUShort(state.RecipientId);
     }
 
     private static TrueHealer.State ReadHealer(ref DataStreamReader reader) => new TrueHealer.State
@@ -835,7 +848,8 @@ internal sealed class CoopSession : MonoBehaviour
         HitHistory = reader.ReadULong(),
         HealSequence = reader.ReadUInt(),
         Recipient = (TrueHealer.HealRecipient)reader.ReadByte(),
-        RestoredHealth = reader.ReadByte()
+        RestoredHealth = reader.ReadByte(),
+        RecipientId = reader.ReadUShort()
     };
 
     private static void WriteGiant(ref DataStreamWriter writer, GiantChargeAttack.State state)
@@ -1033,6 +1047,8 @@ internal sealed class CoopSession : MonoBehaviour
         giant = null;
         ninja = null;
         healer = null;
+        waveDirector = null;
+        lastEnemySnapshots.Clear();
         meleeSequence = 0;
         meleeYaw = 0f;
         meleeStrike = 0;

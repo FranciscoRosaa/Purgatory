@@ -14,6 +14,7 @@ public sealed class GameplayHud : MonoBehaviour
     [SerializeField] private Text healthLabel;
     [SerializeField] private Text timerLabel;
     [SerializeField] private Text waveLabel;
+    [SerializeField] private Text enemyLabel;
     [SerializeField, Min(1)] private int maxHealth = StartingHealth;
     [SerializeField, Min(0)] private int health = StartingHealth;
     [SerializeField, Min(1)] private int wave = 1;
@@ -21,6 +22,7 @@ public sealed class GameplayHud : MonoBehaviour
 
     private double startTime;
     private int displayedSeconds = -1;
+    private int displayedEnemies = -1, displayedEnemyTotal = -1;
     private float damageTime = float.NegativeInfinity;
     private float dodgeTime = float.NegativeInfinity;
     private RawImage damageVignette;
@@ -32,6 +34,23 @@ public sealed class GameplayHud : MonoBehaviour
     private Vector3 cameraOffset;
 
     internal int Health => health;
+
+    internal void SetWave(int current, int total)
+    {
+        totalWaves = Mathf.Max(0, total);
+        wave = totalWaves > 0 ? Mathf.Clamp(current, 1, totalWaves) : 0;
+        if (waveLabel != null) waveLabel.text = $"{wave:D2}/{totalWaves:D2}";
+    }
+
+    internal void SetEnemyCount(int remaining, int total)
+    {
+        total = Mathf.Max(0, total);
+        remaining = Mathf.Clamp(remaining, 0, total);
+        if (remaining == displayedEnemies && total == displayedEnemyTotal) return;
+        displayedEnemies = remaining;
+        displayedEnemyTotal = total;
+        if (enemyLabel != null) enemyLabel.text = $"{remaining}/{total}";
+    }
 
     internal static bool CameraShakeEnabled
     {
@@ -73,8 +92,7 @@ public sealed class GameplayHud : MonoBehaviour
         CreateDamageVignette();
         CreateDodgeLabel();
         SetHealth(health);
-        int waveCount = Mathf.Max(1, totalWaves);
-        waveLabel.text = $"{Mathf.Clamp(wave, 1, waveCount):D2}/{waveCount:D2}";
+        SetWave(wave, totalWaves);
         startTime = Time.timeAsDouble;
         UpdateTimer(0);
     }

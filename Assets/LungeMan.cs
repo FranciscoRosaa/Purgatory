@@ -81,6 +81,11 @@ public sealed class LungeMan : CombatEnemy
     internal override int HealthLimit => MaxHealth;
     private bool IsReplica => session != null && session.InMatch && !session.IsHost;
 
+    internal override void ConfigureForWave(WasdBlockMovement source)
+    {
+        if (source != null) walkableGround = source.WalkableGround;
+    }
+
     private void Start()
     {
         player = FindAnyObjectByType<WasdBlockMovement>();
@@ -610,6 +615,9 @@ public sealed class LungeMan : CombatEnemy
 
 public abstract class CombatEnemy : MonoBehaviour
 {
+    internal ushort WaveSpawnId { get; set; }
+    internal virtual void ConfigureForWave(WasdBlockMovement source) { }
+
     internal abstract int Health { get; private protected set; }
     internal abstract int HealthLimit { get; }
     internal abstract void ApplyMeleeStrike(int strike);
