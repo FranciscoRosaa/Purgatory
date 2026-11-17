@@ -7624,6 +7624,8 @@ MonoBehaviour:
     prefab: {fileID: 121410988200989012, guid: ef9adaaa1fb47c44380e62c0b8b53a9e, type: 3}
   - enemy: 3
     prefab: {fileID: 584551858185164461, guid: 1bfd82b91501b3148ab8c16c6b0b8294, type: 3}
+  - enemy: 4
+    prefab: {fileID: 8419030029191355035, guid: 0edf808d408fbe2439a92f25f5cd3c47, type: 3}
   waves:
   - name: 1
     delayBeforeStart: 2
@@ -7728,6 +7730,17 @@ MonoBehaviour:
         count: 1
         delay: 0
         spawnInterval: 0.6
+    enemies: []
+  - name: Gigante Rei - Boss
+    delayBeforeStart: 5
+    subWaves:
+    - name: The King's arrival
+      delayBeforeStart: 0
+      enemies:
+      - enemy: 4
+        count: 1
+        delay: 0
+        spawnInterval: 0
     enemies: []
   startAutomatically: 1
   maxConcurrentEnemies: 8
@@ -13935,7 +13948,7 @@ PrefabInstance:
   serializedVersion: 2
   m_Modification:
     serializedVersion: 3
-    m_TransformParent: {fileID: 0}
+    m_TransformParent: {fileID: 1819572064}
     m_Modifications:
     - target: {fileID: -8679921383154817045, guid: 2e59ade8fb1df364db8f29ee104a4932, type: 3}
       propertyPath: m_LocalScale.x
@@ -13951,19 +13964,19 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 2e59ade8fb1df364db8f29ee104a4932, type: 3}
       propertyPath: m_LocalPosition.x
-      value: -0.15
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 2e59ade8fb1df364db8f29ee104a4932, type: 3}
       propertyPath: m_LocalPosition.y
-      value: 0.35
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 2e59ade8fb1df364db8f29ee104a4932, type: 3}
       propertyPath: m_LocalPosition.z
-      value: 7.35
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 2e59ade8fb1df364db8f29ee104a4932, type: 3}
       propertyPath: m_LocalRotation.w
-      value: 0.2002951
+      value: 1
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 2e59ade8fb1df364db8f29ee104a4932, type: 3}
       propertyPath: m_LocalRotation.x
@@ -13971,7 +13984,7 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 2e59ade8fb1df364db8f29ee104a4932, type: 3}
       propertyPath: m_LocalRotation.y
-      value: 0.9797357
+      value: 0
       objectReference: {fileID: 0}
     - target: {fileID: -8679921383154817045, guid: 2e59ade8fb1df364db8f29ee104a4932, type: 3}
       propertyPath: m_LocalRotation.z
@@ -13991,17 +14004,27 @@ PrefabInstance:
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 2e59ade8fb1df364db8f29ee104a4932, type: 3}
       propertyPath: m_Name
-      value: Rei Gigante
+      value: Visual
       objectReference: {fileID: 0}
     - target: {fileID: 919132149155446097, guid: 2e59ade8fb1df364db8f29ee104a4932, type: 3}
       propertyPath: m_IsActive
-      value: 0
+      value: 1
       objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []
     m_AddedComponents: []
   m_SourcePrefab: {fileID: 100100000, guid: 2e59ade8fb1df364db8f29ee104a4932, type: 3}
+--- !u!95 &713793935 stripped
+Animator:
+  m_CorrespondingSourceObject: {fileID: 5866666021909216657, guid: 2e59ade8fb1df364db8f29ee104a4932, type: 3}
+  m_PrefabInstance: {fileID: 713793934}
+  m_PrefabAsset: {fileID: 0}
+--- !u!4 &713793936 stripped
+Transform:
+  m_CorrespondingSourceObject: {fileID: -8679921383154817045, guid: 2e59ade8fb1df364db8f29ee104a4932, type: 3}
+  m_PrefabInstance: {fileID: 713793934}
+  m_PrefabAsset: {fileID: 0}
 --- !u!1 &721627609
 GameObject:
   m_ObjectHideFlags: 0
@@ -30771,6 +30794,122 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6645145430377573021, guid: 047f54e16830d2140a4f3fe20c9026ac, type: 3}
   m_PrefabInstance: {fileID: 1817076875}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1819572061
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1819572064}
+  - component: {fileID: 1819572063}
+  - component: {fileID: 1819572062}
+  m_Layer: 0
+  m_Name: Gigante Rei
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 0
+--- !u!136 &1819572062
+CapsuleCollider:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1819572061}
+  m_Material: {fileID: 0}
+  m_IncludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_ExcludeLayers:
+    serializedVersion: 2
+    m_Bits: 0
+  m_LayerOverridePriority: 0
+  m_IsTrigger: 1
+  m_ProvidesContacts: 0
+  m_Enabled: 1
+  serializedVersion: 2
+  m_Radius: 1.1
+  m_Height: 3.6
+  m_Direction: 1
+  m_Center: {x: 0, y: 1.8, z: 0}
+--- !u!114 &1819572063
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1819572061}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ea0683a588d505c43ba15155ebbec7d2, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::GiantKing
+  displayName: GIGANTE REI
+  maxHealth: 1200
+  chaseSpeed: 2.1
+  stopDistance: 2.8
+  skillRange: 24
+  skillCooldown: 2.8
+  visual: {fileID: 713793936}
+  animator: {fileID: 713793935}
+  idleAnimation: {fileID: 7994627924475153551, guid: d1ede3bab3ead134bb312d4086c66f3c, type: 3}
+  walkAnimation: {fileID: -7003542030617561338, guid: d1ede3bab3ead134bb312d4086c66f3c, type: 3}
+  chargeAnimation: {fileID: 7400000, guid: 851d8a4c9de4bee44945612eadab2641, type: 2}
+  jumpAnimation: {fileID: -203655887218126122, guid: 58ef0e5760ef6c84d8d0d2b1c97ca2b3, type: 3}
+  rockAnimation: {fileID: 8990922676025542795, guid: 66637478f90e1454bbe6296e1c47fb01, type: 3}
+  rageAnimation: {fileID: -5346644375087571879, guid: d1ede3bab3ead134bb312d4086c66f3c, type: 3}
+  effectMaterial: {fileID: 2100000, guid: 0fe101b940a838146a32a60a51a029a0, type: 2}
+  entranceWindup: 2.5
+  entranceDodgeCueDuration: 0.3
+  safeEdgeWidth: 4.5
+  entranceDamage: 25
+  sprintWindup: 1.2
+  sprintDuration: 3
+  sprintDistance: 10
+  rageSprintDistance: 20
+  contactRadius: 1.65
+  sprintDamage: 12
+  jumpRange: 14
+  jumpSquareSize: 11
+  jumpHeight: 2.2
+  jumpTakeoff: 0.52
+  jumpLanding: 1.53
+  jumpDamage: 18
+  rageJumpCount: 2
+  pillarCount: {x: 7, y: 10}
+  ragePillarCount: {x: 14, y: 20}
+  pillarRadius: 14
+  pillarSquareSize: 3.2
+  pillarWarning: 1.1
+  pillarStagger: 0.13
+  pillarHeight: 4
+  pillarDamage: 15
+  rageHealthFraction: 0.5
+  rageDuration: 2.2
+  rageDamageMultiplier: 1.5
+  rageCooldownMultiplier: 0.7
+  rageWarningMultiplier: 0.8
+  walkableGround: []
+  movementBoundary: {fileID: 0}
+--- !u!4 &1819572064
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1819572061}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -0.15, y: 0.35, z: 7.35}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 713793936}
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &1821120992
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -35870,8 +36009,8 @@ SceneRoots:
   - {fileID: 834118206}
   - {fileID: 1033902011}
   - {fileID: 248833691}
-  - {fileID: 713793934}
   - {fileID: 544709119}
   - {fileID: 353868667}
   - {fileID: 2065911725}
   - {fileID: 401941738}
+  - {fileID: 1819572064}

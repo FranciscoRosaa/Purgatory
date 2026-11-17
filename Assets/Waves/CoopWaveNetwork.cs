@@ -61,6 +61,7 @@ internal sealed partial class CoopSession
         WaveEnemyKind.Giant => 53,
         WaveEnemyKind.RedNinja => 63,
         WaveEnemyKind.TrueHealer => 42,
+        WaveEnemyKind.GiantKing => GiantKingStateBytes,
         _ => -1
     };
 
@@ -85,6 +86,7 @@ internal sealed partial class CoopSession
                     case GiantChargeAttack giantEnemy: WriteGiant(ref writer, giantEnemy.GetState()); break;
                     case RedNinja red: WriteNinja(ref writer, red.GetState()); break;
                     case TrueHealer healerEnemy: WriteHealer(ref writer, healerEnemy.GetState()); break;
+                    case GiantKing boss: WriteKing(ref writer, boss.GetState()); break;
                 }
                 driver.EndSend(writer);
             }
@@ -122,6 +124,14 @@ internal sealed partial class CoopSession
                 var healerState = ReadHealer(ref reader);
                 if (!ValidEnemyPosition(healerState.Position)) return;
                 (waveDirector.GetOrSpawnReplica(id, kind, healerState.Position) as TrueHealer)?.ApplyState(healerState);
+                break;
+            case WaveEnemyKind.GiantKing:
+                var kingState = ReadKing(ref reader);
+                if (!ValidEnemyPosition(kingState.Position) || !ValidEnemyPosition(kingState.Target) ||
+                    !ValidEnemyPosition(kingState.Origin) || kingState.Phase > GiantKing.Phase.Dead ||
+                    kingState.Health < 0 || !float.IsFinite(kingState.Elapsed) || !float.IsFinite(kingState.Yaw) ||
+                    !float.IsFinite(kingState.HazardElapsed)) return;
+                (waveDirector.GetOrSpawnReplica(id, kind, kingState.Position) as GiantKing)?.ApplyState(kingState);
                 break;
         }
         lastEnemySnapshots[id] = sequence;

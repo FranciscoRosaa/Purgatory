@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
 
-public enum WaveEnemyKind : byte { LungeMan, Giant, RedNinja, TrueHealer }
+public enum WaveEnemyKind : byte { LungeMan, Giant, RedNinja, TrueHealer, GiantKing }
 
 [DefaultExecutionOrder(-200)]
 public sealed class WaveDirector : MonoBehaviour
