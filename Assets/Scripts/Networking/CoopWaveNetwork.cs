@@ -62,6 +62,7 @@ internal sealed partial class CoopSession
         WaveEnemyKind.RedNinja => 63,
         WaveEnemyKind.TrueHealer => 42,
         WaveEnemyKind.GiantKing => GiantKingStateBytes,
+        WaveEnemyKind.BlackNinja => 74,
         _ => -1
     };
 
@@ -87,6 +88,7 @@ internal sealed partial class CoopSession
                     case RedNinja red: WriteNinja(ref writer, red.GetState()); break;
                     case TrueHealer healerEnemy: WriteHealer(ref writer, healerEnemy.GetState()); break;
                     case GiantKing boss: WriteKing(ref writer, boss.GetState()); break;
+                    case BlackNinja black: WriteBlackNinja(ref writer, black.GetState()); break;
                 }
                 driver.EndSend(writer);
             }
@@ -105,6 +107,14 @@ internal sealed partial class CoopSession
         // Each actor has its own sequence and identity: several enemies of the same type are supported.
         switch (kind)
         {
+            case WaveEnemyKind.BlackNinja:
+                var black=ReadBlackNinja(ref reader);
+                if(!ValidEnemyPosition(black.Position) || !ValidEnemyPosition(black.Origin) || !ValidEnemyPosition(black.Direction) ||
+                    black.Phase>BlackNinja.Phase.Dead || black.Strike>2 || black.Health<0 || black.Health>100000 ||
+                    !float.IsFinite(black.Yaw) || !float.IsFinite(black.Elapsed) || !float.IsFinite(black.Length) || black.Length<0 ||
+                    !float.IsFinite(black.Opacity) || black.Opacity<0 || black.Opacity>1)return;
+                (waveDirector.GetOrSpawnReplica(id,kind,black.Position) as BlackNinja)?.ApplyState(black);
+                break;
             case WaveEnemyKind.LungeMan:
                 var lunge = ReadEnemy(ref reader);
                 if (!ValidEnemyPosition(lunge.Position)) return;

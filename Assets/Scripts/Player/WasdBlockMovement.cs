@@ -57,6 +57,21 @@ public sealed class WasdBlockMovement : MonoBehaviour
 
     internal void ClearAttackSlow() => attackSlowUntil = 0f;
 
+    internal void SetEnvironment(Collider[] ground, BoxCollider boundary)
+    {
+        walkableGround=ground;
+        movementBoundary=boundary;
+    }
+
+    internal void WarpTo(Vector3 position)
+    {
+        dashTimeLeft=0f;knockbackTimeLeft=0f;dashedThisFrame=false;UsesDashGrounding=false;
+        dashPresentation?.Reset();
+        transform.position=position;
+        previousPosition=position;
+    }
+
+
     internal void FlashAreaAttack() => dashPresentation?.FlashMelee();
 
     internal void ApplySprintKnockback(Vector3 direction)
@@ -278,6 +293,7 @@ public sealed class WasdBlockMovement : MonoBehaviour
             return false;
 
         nextPosition.y = groundHeight;
+        if (LibraryWorld.Active != null && LibraryWorld.Active.BlocksMovement(nextPosition)) return false;
         transform.position = nextPosition;
         return true;
     }
