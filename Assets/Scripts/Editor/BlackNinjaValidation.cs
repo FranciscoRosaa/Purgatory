@@ -53,7 +53,7 @@ public static class BlackNinjaValidation
             if(stage==1)
             {
                 var waves=UnityEngine.Object.FindAnyObjectByType<WaveDirector>();
-                Set(waves,"waveIndex",4);Set(waves,"subWaveIndex",0);Set(waves,"stage",WaveDirector.WaveStage.Countdown);Set(waves,"nextWaveAt",0f);
+                Set(waves,"waveIndex",4);Set(waves,"stage",WaveDirector.WaveStage.Countdown);Set(waves,"nextWaveAt",0f);
                 Call(waves,"Tick",Time.time);Call(waves,"Tick",Time.time);
                 actor=UnityEngine.Object.FindAnyObjectByType<BlackNinja>();
                 Check(actor!=null && waves.CurrentWave==5 && waves.AliveEnemies==1,"Configured library wave spawns the Black Ninja");

@@ -69,11 +69,9 @@ public static class SetupBlackNinja
         {
             waves.arraySize=5;var wave=waves.GetArrayElementAtIndex(4);wave.FindPropertyRelative("name").stringValue="Biblioteca - Ninja Preto";
             wave.FindPropertyRelative("delayBeforeStart").floatValue=6;wave.FindPropertyRelative("enemies").arraySize=0;
-            var subs=wave.FindPropertyRelative("subWaves");subs.arraySize=1;var sub=subs.GetArrayElementAtIndex(0);
-            sub.FindPropertyRelative("name").stringValue="Surprise in the library";sub.FindPropertyRelative("delayBeforeStart").floatValue=0;
-            var groups=sub.FindPropertyRelative("enemies");groups.arraySize=1;var group=groups.GetArrayElementAtIndex(0);
+            wave.FindPropertyRelative("maxConcurrentEnemies").intValue=8;
+            var groups=wave.FindPropertyRelative("enemies");groups.arraySize=1;var group=groups.GetArrayElementAtIndex(0);
             group.FindPropertyRelative("enemy").enumValueIndex=(int)WaveEnemyKind.BlackNinja;group.FindPropertyRelative("count").intValue=1;
-            group.FindPropertyRelative("delay").floatValue=0;group.FindPropertyRelative("spawnInterval").floatValue=0;
         }
         ws.ApplyModifiedPropertiesWithoutUndo();
         AssetDatabase.SaveAssets();EditorSceneManager.MarkSceneDirty(scene);EditorSceneManager.SaveScene(scene);Selection.activeGameObject=actor.gameObject;

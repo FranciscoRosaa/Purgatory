@@ -8278,6 +8278,37 @@ Transform:
   - {fileID: 411411294}
   m_Father: {fileID: 2065744831}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &341545651
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 341545652}
+  m_Layer: 0
+  m_Name: Black rhombus 4
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &341545652
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 341545651}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 13.5, y: 0.08, z: -13.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 859770465}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &341699588 stripped
 GameObject:
   m_CorrespondingSourceObject: {fileID: 3234341973108490180, guid: 6f321850f51333844a504eae6e3fe065, type: 3}
@@ -9445,135 +9476,107 @@ MonoBehaviour:
     prefab: {fileID: 8419030029191355035, guid: 0edf808d408fbe2439a92f25f5cd3c47, type: 3}
   - enemy: 5
     prefab: {fileID: 9147714177785208352, guid: fcb73aca5d94b184faa7bbfc841a8871, type: 3}
+  - enemy: 6
+    prefab: {fileID: 8903863179039023819, guid: 03e70f00cd0a5a34d88b6f5daeda3b98, type: 3}
+  - enemy: 7
+    prefab: {fileID: 883447699518491143, guid: 41190b216a4886948a586591ca33892d, type: 3}
   waves:
   - name: 1
     delayBeforeStart: 2
-    subWaves:
-    - name: LungeMan 1
-      delayBeforeStart: 0
-      enemies:
-      - enemy: 0
-        count: 1
-        delay: 0
-        spawnInterval: 0
-    - name: LungeMan 2
-      delayBeforeStart: 0
-      enemies:
-      - enemy: 0
-        count: 1
-        delay: 0
-        spawnInterval: 0
-    enemies: []
+    maxConcurrentEnemies: 8
+    enemies:
+    - enemy: 0
+      count: 2
+    legacySubWaves: []
   - name: 2
     delayBeforeStart: 4
-    subWaves:
-    - name: NinjaV&Giant 1
-      delayBeforeStart: 0
-      enemies:
-      - enemy: 2
-        count: 1
-        delay: 0
-        spawnInterval: 0.6
-      - enemy: 1
-        count: 1
-        delay: 0
-        spawnInterval: 0.6
-    - name: NinjaV&Giant 2
-      delayBeforeStart: 0
-      enemies:
-      - enemy: 2
-        count: 1
-        delay: 0
-        spawnInterval: 0.6
-      - enemy: 1
-        count: 1
-        delay: 0
-        spawnInterval: 0.6
-    - name: NinjaV&Giant 3
-      delayBeforeStart: 0
-      enemies:
-      - enemy: 2
-        count: 1
-        delay: 0
-        spawnInterval: 0.6
-      - enemy: 1
-        count: 1
-        delay: 0
-        spawnInterval: 0.6
-    enemies: []
+    maxConcurrentEnemies: 8
+    enemies:
+    - enemy: 2
+      count: 3
+    - enemy: 1
+      count: 3
+    legacySubWaves: []
   - name: 3
     delayBeforeStart: 4
-    subWaves:
-    - name: Giant&LungeMan&Healer 1
-      delayBeforeStart: 0
-      enemies:
-      - enemy: 0
-        count: 1
-        delay: 0
-        spawnInterval: 0.6
-      - enemy: 1
-        count: 1
-        delay: 0
-        spawnInterval: 0.6
-      - enemy: 3
-        count: 1
-        delay: 0
-        spawnInterval: 0.6
-    - name: Giant&LungeMan&Healer 2
-      delayBeforeStart: 0
-      enemies:
-      - enemy: 0
-        count: 1
-        delay: 0
-        spawnInterval: 0.6
-      - enemy: 1
-        count: 1
-        delay: 0
-        spawnInterval: 0.6
-      - enemy: 3
-        count: 1
-        delay: 0
-        spawnInterval: 0.6
-    - name: Giant&LungeMan&Healer 3
-      delayBeforeStart: 0
-      enemies:
-      - enemy: 0
-        count: 1
-        delay: 0
-        spawnInterval: 0.6
-      - enemy: 1
-        count: 1
-        delay: 0
-        spawnInterval: 0.6
-      - enemy: 3
-        count: 1
-        delay: 0
-        spawnInterval: 0.6
-    enemies: []
+    maxConcurrentEnemies: 8
+    enemies:
+    - enemy: 0
+      count: 3
+    - enemy: 1
+      count: 3
+    - enemy: 3
+      count: 3
+    legacySubWaves: []
   - name: Gigante Rei - Boss
     delayBeforeStart: 5
-    subWaves:
-    - name: The King's arrival
-      delayBeforeStart: 0
-      enemies:
-      - enemy: 4
-        count: 1
-        delay: 0
-        spawnInterval: 0
-    enemies: []
-  - name: Biblioteca - Ninja Preto
+    maxConcurrentEnemies: 8
+    enemies:
+    - enemy: 4
+      count: 1
+    legacySubWaves: []
+  - name: Library - Wave 5
     delayBeforeStart: 6
-    subWaves:
-    - name: Surprise in the library
-      delayBeforeStart: 0
-      enemies:
-      - enemy: 5
-        count: 1
-        delay: 0
-        spawnInterval: 0
-    enemies: []
+    maxConcurrentEnemies: 8
+    enemies:
+    - enemy: 0
+      count: 1
+    - enemy: 3
+      count: 1
+    - enemy: 7
+      count: 1
+    - enemy: 6
+      count: 2
+    - enemy: 5
+      count: 1
+    legacySubWaves: []
+  - name: Library - Wave 6
+    delayBeforeStart: 4
+    maxConcurrentEnemies: 8
+    enemies:
+    - enemy: 5
+      count: 2
+    - enemy: 0
+      count: 1
+    - enemy: 1
+      count: 1
+    - enemy: 2
+      count: 2
+    - enemy: 3
+      count: 1
+    - enemy: 6
+      count: 1
+    - enemy: 7
+      count: 1
+    legacySubWaves: []
+  - name: Library - Wave 7
+    delayBeforeStart: 4
+    maxConcurrentEnemies: 8
+    enemies:
+    - enemy: 5
+      count: 2
+    - enemy: 1
+      count: 2
+    - enemy: 7
+      count: 2
+    - enemy: 0
+      count: 2
+    - enemy: 2
+      count: 3
+    - enemy: 3
+      count: 1
+    - enemy: 6
+      count: 3
+    legacySubWaves: []
+  - name: Library - Boss
+    delayBeforeStart: 6
+    maxConcurrentEnemies: 1
+    enemies:
+    - enemy: 4
+      count: 1
+    legacySubWaves: []
   startAutomatically: 1
-  maxConcurrentEnemies: 8
+  legacyConcurrentLimit: 8
   spawnPoints:
   - {fileID: 390828192}
   - {fileID: 1837810950}
@@ -12586,6 +12589,37 @@ Transform:
   - {fileID: 1533097141}
   - {fileID: 520083120}
   m_Father: {fileID: 2065744831}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &583505990
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 583505991}
+  m_Layer: 0
+  m_Name: Black rhombus 2
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &583505991
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 583505990}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -13.5, y: 0.08, z: -13.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 859770465}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &587301574
 PrefabInstance:
@@ -18234,6 +18268,42 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 6888191511679883796, guid: 44e8a323d9b0322419102d25f44c9e7c, type: 3}
   m_PrefabInstance: {fileID: 858517703}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &859770464
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 859770465}
+  m_Layer: 0
+  m_Name: Teleport pads
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &859770465
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 859770464}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children:
+  - {fileID: 1153669960}
+  - {fileID: 583505991}
+  - {fileID: 1774245649}
+  - {fileID: 341545652}
+  - {fileID: 978027837}
+  m_Father: {fileID: 980831395}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1001 &861231033
 PrefabInstance:
   m_ObjectHideFlags: 0
@@ -20560,6 +20630,37 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5396894160626276527, guid: 1aaa2ef25cc4cd747aedddc9af031bf9, type: 3}
   m_PrefabInstance: {fileID: 972667401}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &978027836
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 978027837}
+  m_Layer: 0
+  m_Name: Black rhombus 5
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &978027837
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 978027836}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 13.5, y: 0.08, z: 13.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 859770465}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &978628152
 GameObject:
   m_ObjectHideFlags: 0
@@ -20666,6 +20767,7 @@ GameObject:
   m_Component:
   - component: {fileID: 980831395}
   - component: {fileID: 980831394}
+  - component: {fileID: 980831396}
   m_Layer: 0
   m_Name: Library World
   m_TagString: Untagged
@@ -20731,8 +20833,27 @@ Transform:
   - {fileID: 2117445028}
   - {fileID: 1971194082}
   - {fileID: 2112176313}
+  - {fileID: 859770465}
   m_Father: {fileID: 0}
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &980831396
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 980831393}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d5a34c9903c65c34f9d54ae20f7e4693, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::LibraryHazard
+  teleportPads:
+  - {fileID: 1153669960}
+  - {fileID: 583505991}
+  - {fileID: 1774245649}
+  - {fileID: 341545652}
+  - {fileID: 978027837}
 --- !u!1 &998113599
 GameObject:
   m_ObjectHideFlags: 0
@@ -22883,6 +23004,37 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 193158055773013314, guid: 56765c5bc576bcc4db95fbe473e81cff, type: 3}
   m_PrefabInstance: {fileID: 1152429949}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1153669959
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1153669960}
+  m_Layer: 0
+  m_Name: Black rhombus 1
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1153669960
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1153669959}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0.08, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 859770465}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1166486305
 GameObject:
   m_ObjectHideFlags: 0
@@ -33131,6 +33283,37 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 5396894160626276527, guid: 1aaa2ef25cc4cd747aedddc9af031bf9, type: 3}
   m_PrefabInstance: {fileID: 1769290719}
   m_PrefabAsset: {fileID: 0}
+--- !u!1 &1774245648
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1774245649}
+  m_Layer: 0
+  m_Name: Black rhombus 3
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1774245649
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1774245648}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: -13.5, y: 0.08, z: 13.5}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 859770465}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
 --- !u!1 &1778172852
 GameObject:
   m_ObjectHideFlags: 0

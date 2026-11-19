@@ -6,7 +6,7 @@ using UnityEngine;
 internal sealed partial class CoopSession
 {
     private const byte WaveEnemyMessage = 3;
-    private const int WaveHeaderBytes = 27;
+    private const int WaveHeaderBytes = 25;
     private WaveDirector waveDirector;
     private readonly Dictionary<ushort, uint> lastEnemySnapshots = new Dictionary<ushort, uint>();
 
@@ -19,15 +19,15 @@ internal sealed partial class CoopSession
     }
 
     private int CombatBytes => waveDirector != null
-        ? 13 + WaveHeaderBytes + waveDirector.Spawned.Count * 2 : CombatSnapshotBytes + 1;
+        ? 13 + LibraryHazardBytes + WaveHeaderBytes + waveDirector.Spawned.Count * 2
+        : CombatSnapshotBytes + 1 + LibraryHazardBytes;
 
     private void WriteWaveSnapshot(ref DataStreamWriter writer)
     {
         writer.WriteByte((byte)waveDirector.Stage);
         writer.WriteUShort((ushort)waveDirector.CurrentWave);
         writer.WriteUShort((ushort)waveDirector.TotalWaves);
-        writer.WriteUShort((ushort)waveDirector.CurrentSubWave);
-        writer.WriteUShort((ushort)waveDirector.TotalSubWaves);
+        writer.WriteUShort((ushort)waveDirector.CurrentEnemyLimit);
         writer.WriteInt(waveDirector.AliveEnemies);
         writer.WriteInt(waveDirector.EnemiesWaitingToSpawn);
         writer.WriteInt(waveDirector.TotalEnemiesInCurrentWave);
@@ -41,16 +41,17 @@ internal sealed partial class CoopSession
         if (reader.Length - reader.GetBytesRead() < WaveHeaderBytes) return;
         var stage = (WaveDirector.WaveStage)reader.ReadByte();
         int current = reader.ReadUShort(), total = reader.ReadUShort();
-        int currentSub = reader.ReadUShort(), totalSub = reader.ReadUShort();
+        int limit = reader.ReadUShort();
         int alive = reader.ReadInt(), pending = reader.ReadInt(), totalEnemies = reader.ReadInt();
         float countdown = reader.ReadFloat();
         int count = reader.ReadUShort();
-        if (stage > WaveDirector.WaveStage.SubWaveCountdown || current > total || currentSub > totalSub ||
+        if (stage > WaveDirector.WaveStage.Complete || current > total ||
+            limit < 1 || limit > WaveDirector.MaximumConcurrentEnemies ||
             alive < 0 || alive > WaveDirector.MaximumConcurrentEnemies || pending < 0 || totalEnemies < 0 ||
             count > 128 || reader.Length - reader.GetBytesRead() != count * 2) return;
         var manifest = new ushort[count];
         for (int i = 0; i < count; i++) manifest[i] = reader.ReadUShort();
-        waveDirector?.ApplyRemoteWave(stage, current, total, currentSub, totalSub, alive, pending, totalEnemies, countdown, manifest);
+        waveDirector?.ApplyRemoteWave(stage, current, total, limit, alive, pending, totalEnemies, countdown, manifest);
         foreach (ushort id in new List<ushort>(lastEnemySnapshots.Keys))
             if (waveDirector == null || !waveDirector.AcceptsReplica(id)) lastEnemySnapshots.Remove(id);
     }
@@ -63,6 +64,8 @@ internal sealed partial class CoopSession
         WaveEnemyKind.TrueHealer => 42,
         WaveEnemyKind.GiantKing => GiantKingStateBytes,
         WaveEnemyKind.BlackNinja => 74,
+        WaveEnemyKind.ArcaneEye => 70,
+        WaveEnemyKind.Wizard => 118,
         _ => -1
     };
 
@@ -89,6 +92,8 @@ internal sealed partial class CoopSession
                     case TrueHealer healerEnemy: WriteHealer(ref writer, healerEnemy.GetState()); break;
                     case GiantKing boss: WriteKing(ref writer, boss.GetState()); break;
                     case BlackNinja black: WriteBlackNinja(ref writer, black.GetState()); break;
+                    case ArcaneEye eye: WriteArcaneEye(ref writer, eye.GetState()); break;
+                    case Wizard wizard: WriteWizard(ref writer, wizard.GetState()); break;
                 }
                 driver.EndSend(writer);
             }
@@ -107,6 +112,22 @@ internal sealed partial class CoopSession
         // Each actor has its own sequence and identity: several enemies of the same type are supported.
         switch (kind)
         {
+            case WaveEnemyKind.Wizard:
+                var wizard = ReadWizard(ref reader);
+                if (!ValidEnemyPosition(wizard.Position) || !ValidEnemyPosition(wizard.Destination) ||
+                    wizard.Phase > Wizard.Phase.Dead || wizard.Health < 0 || wizard.Health > Wizard.MaximumHealth ||
+                    !float.IsFinite(wizard.Yaw) || !float.IsFinite(wizard.Elapsed) || wizard.Elapsed < 0f ||
+                    !ValidWizardOrb(wizard.First) || !ValidWizardOrb(wizard.Second)) return;
+                (waveDirector.GetOrSpawnReplica(id, kind, wizard.Position) as Wizard)?.ApplyState(wizard);
+                break;
+            case WaveEnemyKind.ArcaneEye:
+                var eye = ReadArcaneEye(ref reader);
+                if (!ValidEnemyPosition(eye.Position) || !ValidEnemyPosition(eye.Origin) ||
+                    !ValidEnemyPosition(eye.Direction) || eye.Phase > ArcaneEye.Phase.Dead ||
+                    eye.Attack > ArcaneEye.Attack.Chain || eye.Health < 0 || eye.Health > ArcaneEye.MaximumHealth ||
+                    !float.IsFinite(eye.Yaw) || !float.IsFinite(eye.Elapsed) || eye.Elapsed < 0f) return;
+                (waveDirector.GetOrSpawnReplica(id, kind, eye.Position) as ArcaneEye)?.ApplyState(eye);
+                break;
             case WaveEnemyKind.BlackNinja:
                 var black=ReadBlackNinja(ref reader);
                 if(!ValidEnemyPosition(black.Position) || !ValidEnemyPosition(black.Origin) || !ValidEnemyPosition(black.Direction) ||

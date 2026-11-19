@@ -2,8 +2,9 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.Serialization;
 
-public enum WaveEnemyKind : byte { LungeMan, Giant, RedNinja, TrueHealer, GiantKing, BlackNinja }
+public enum WaveEnemyKind : byte { LungeMan, Giant, RedNinja, TrueHealer, GiantKing, BlackNinja, ArcaneEye, Wizard }
 
 [DefaultExecutionOrder(-200)]
 public sealed class WaveDirector : MonoBehaviour
@@ -15,17 +16,12 @@ public sealed class WaveDirector : MonoBehaviour
     {
         public WaveEnemyKind enemy;
         [Min(0)] public int count = 1;
-        [Min(0f)] public float delay;
-        [Min(0f)] public float spawnInterval = 0.6f;
     }
 
     [Serializable]
-    public sealed class SubWave
+    internal sealed class LegacySubWave
     {
-        public string name = "New sub-wave";
-        [Min(0f), Tooltip("Delay for the remaining enemies after the previous sub-wave clears. Same-type replacements spawn immediately on a kill.")]
-        public float delayBeforeStart;
-        public EnemyGroup[] enemies = { new EnemyGroup() };
+        public EnemyGroup[] enemies;
     }
 
     [Serializable]
@@ -33,9 +29,10 @@ public sealed class WaveDirector : MonoBehaviour
     {
         public string name = "New wave";
         [Min(0f)] public float delayBeforeStart = 4f;
-        public SubWave[] subWaves = Array.Empty<SubWave>();
-        // Retain the old serialized field so previously configured scenes keep their enemies.
-        [HideInInspector] public EnemyGroup[] enemies = Array.Empty<EnemyGroup>();
+        [Range(1, MaximumConcurrentEnemies)] public int maxConcurrentEnemies;
+        public EnemyGroup[] enemies = Array.Empty<EnemyGroup>();
+        [SerializeField, HideInInspector, FormerlySerializedAs("subWaves")]
+        internal LegacySubWave[] legacySubWaves;
     }
 
     [Serializable]
@@ -45,7 +42,7 @@ public sealed class WaveDirector : MonoBehaviour
         public CombatEnemy prefab;
     }
 
-    public enum WaveStage : byte { Stopped, Countdown, Spawning, Fighting, Complete, SubWaveCountdown }
+    public enum WaveStage : byte { Stopped, Countdown, Spawning, Fighting, Complete }
 
     [Header("Enemy prefabs")]
     [SerializeField] private EnemyPrefab[] enemyPrefabs = Array.Empty<EnemyPrefab>();
@@ -53,7 +50,8 @@ public sealed class WaveDirector : MonoBehaviour
     [SerializeField] private Wave[] waves = Array.Empty<Wave>();
     [Header("Spawning")]
     [SerializeField] private bool startAutomatically = true;
-    [SerializeField, Range(1, MaximumConcurrentEnemies)] private int maxConcurrentEnemies = 8;
+    [SerializeField, HideInInspector, FormerlySerializedAs("maxConcurrentEnemies")]
+    private int legacyConcurrentLimit = 8;
     [SerializeField] private Transform[] spawnPoints = Array.Empty<Transform>();
     [SerializeField, Min(1f)] private float spawnRadius = 13f;
     [SerializeField, Min(0f)] private float minimumPlayerDistance = 6f;
@@ -69,19 +67,14 @@ public sealed class WaveDirector : MonoBehaviour
         internal WaveEnemyKind Kind;
         internal CombatEnemy Enemy;
         internal int WaveIndex;
-        internal int SubWaveIndex;
         internal float DiedAt = -1f;
     }
 
     private sealed class PendingGroup
     {
-        internal EnemyGroup Group;
+        internal WaveEnemyKind Kind;
         internal CombatEnemy Prefab;
-        internal int SubWaveIndex;
         internal int Remaining;
-        internal int Replacements;
-        internal bool Started;
-        internal float NextSpawn;
     }
 
     private readonly List<SpawnedEnemy> spawned = new List<SpawnedEnemy>();
@@ -91,36 +84,29 @@ public sealed class WaveDirector : MonoBehaviour
     private GameplayHud hud;
     private CoopSession session;
     private WaveStage stage;
-    private int waveIndex, subWaveIndex;
+    private int waveIndex;
     private float nextWaveAt;
     private ushort nextEnemyId;
-    private int remoteAlive, remotePending, remoteTotal, remoteSubWaveTotal, remoteEnemyTotal;
+    private int remoteAlive, remotePending, remoteTotal, remoteEnemyTotal, remoteLimit;
     private float remoteCountdown;
     private string displayedStatus;
 
     public WaveStage Stage => stage;
     public int TotalWaves => IsReplica ? remoteTotal : waves?.Length ?? 0;
     public int CurrentWave => TotalWaves == 0 ? 0 : Mathf.Clamp(waveIndex + 1, 1, TotalWaves);
-    public int TotalSubWaves => IsReplica ? remoteSubWaveTotal : GetSubWaveCount();
-    public int CurrentSubWave => TotalSubWaves == 0 ? 0 : Mathf.Clamp(subWaveIndex + 1, 1, TotalSubWaves);
+    public int CurrentEnemyLimit => IsReplica ? remoteLimit :
+        Mathf.Clamp(CurrentDefinition?.maxConcurrentEnemies > 0
+            ? CurrentDefinition.maxConcurrentEnemies : legacyConcurrentLimit, 1, MaximumConcurrentEnemies);
+    private Wave CurrentDefinition => waves != null && waveIndex >= 0 && waveIndex < waves.Length ? waves[waveIndex] : null;
     public int TotalEnemiesInCurrentWave => IsReplica ? remoteEnemyTotal : CountWaveEnemies();
     public int RemainingEnemiesInCurrentWave => stage == WaveStage.Countdown
         ? TotalEnemiesInCurrentWave : AliveEnemies + EnemiesWaitingToSpawn;
 
     private int CountWaveEnemies()
     {
-        if (waves == null || waveIndex < 0 || waveIndex >= waves.Length || waves[waveIndex] == null)
-            return 0;
-        var definition = waves[waveIndex];
+        var definition = CurrentDefinition;
         long count = 0;
-        if (definition.subWaves != null && definition.subWaves.Length > 0)
-        {
-            foreach (var sub in definition.subWaves)
-                if (sub?.enemies != null)
-                    foreach (var group in sub.enemies)
-                        if (group != null) count += Mathf.Max(0, group.count);
-        }
-        else if (definition.enemies != null)
+        if (definition?.enemies != null)
             foreach (var group in definition.enemies)
                 if (group != null) count += Mathf.Max(0, group.count);
         return (int)System.Math.Min(count, int.MaxValue);
@@ -143,18 +129,19 @@ public sealed class WaveDirector : MonoBehaviour
         get
         {
             if (IsReplica) return remotePending;
-            int count = 0;
+            long count = 0;
             foreach (var group in pending) count += group.Remaining;
-            return count;
+            return (int)System.Math.Min(count, int.MaxValue);
         }
     }
     internal bool IsReplica => session != null && session.InMatch && !session.IsHost;
     internal IReadOnlyList<SpawnedEnemy> Spawned => spawned;
-    internal float Countdown => stage == WaveStage.Countdown || stage == WaveStage.SubWaveCountdown
+    internal float Countdown => stage == WaveStage.Countdown
         ? IsReplica ? Mathf.Max(0f, remoteCountdown - Time.time) : Mathf.Max(0f, nextWaveAt - Time.time) : 0f;
 
     private void Awake()
     {
+        MigrateLegacyWaves();
         player = FindAnyObjectByType<WasdBlockMovement>();
         hud = FindAnyObjectByType<GameplayHud>();
         session = FindAnyObjectByType<CoopSession>();
@@ -182,7 +169,7 @@ public sealed class WaveDirector : MonoBehaviour
         ClearSpawned();
         pending.Clear();
         waveIndex = 0;
-        subWaveIndex = 0;
+        MigrateLegacyWaves();
         if (waves == null || waves.Length == 0)
         {
             stage = WaveStage.Complete;
@@ -196,114 +183,62 @@ public sealed class WaveDirector : MonoBehaviour
     internal void Tick(float now)
     {
         CleanupDefeated(now);
-        if (stage == WaveStage.Countdown && now >= nextWaveAt) BeginWave(now);
-        if (stage == WaveStage.SubWaveCountdown && now >= nextWaveAt) BeginSubWave(now);
-        if (stage != WaveStage.Spawning && stage != WaveStage.Fighting &&
-            stage != WaveStage.SubWaveCountdown) return;
+        if (stage == WaveStage.Countdown && now >= nextWaveAt) BeginWave();
+        if (stage != WaveStage.Spawning && stage != WaveStage.Fighting) return;
 
-        int budget = 8;
+        int alive = AliveEnemies;
+        int waiting = EnemiesWaitingToSpawn;
+        while (alive < CurrentEnemyLimit && waiting > 0 && spawned.Count < 128)
+        {
+            if (!TryChooseSpawn(out var position)) break;
+            var group = ChoosePendingGroup();
+            if (group == null) break;
+            if (++nextEnemyId == 0) nextEnemyId = 1;
+            Spawn(group.Kind, group.Prefab, position, nextEnemyId);
+            group.Remaining--;
+            alive++;
+            waiting--;
+        }
+        stage = waiting > 0 ? WaveStage.Spawning : WaveStage.Fighting;
+        if (alive == 0 && waiting == 0) FinishWave(now);
+    }
+
+    private PendingGroup ChoosePendingGroup()
+    {
+        long total = 0;
+        foreach (var group in pending) total += group.Remaining;
+        if (total == 0) return null;
+        // Draw from the remaining individual enemies, preserving each configured quantity.
+        long choice = System.Math.Min(total - 1, (long)(UnityEngine.Random.value * (double)total));
         foreach (var group in pending)
         {
-            // A kill releases one matching enemy immediately, even when its sub-wave
-            // has not begun or another enemy from an earlier sub-wave is still alive.
-            while (group.Remaining > 0 &&
-                (group.Replacements > 0 || group.Started && now >= group.NextSpawn) && budget > 0 &&
-                spawned.Count < 128 &&
-                AliveEnemies < Mathf.Clamp(maxConcurrentEnemies, 1, MaximumConcurrentEnemies))
+            if (choice < group.Remaining) return group;
+            choice -= group.Remaining;
+        }
+        return null;
+    }
+
+    private void BeginWave()
+    {
+        pending.Clear();
+        var definition = CurrentDefinition;
+        if (definition?.enemies != null)
+        {
+            foreach (var group in definition.enemies)
             {
-                if (!TryChooseSpawn(out var position))
+                if (group == null || group.count <= 0) continue;
+                var prefab = GetPrefab(group.enemy);
+                if (prefab == null)
                 {
-                    group.NextSpawn = now + 0.5f;
-                    break;
+                    Debug.LogError($"Wave {CurrentWave}: missing prefab for {group.enemy}. Waves stopped.", this);
+                    pending.Clear();
+                    stage = WaveStage.Stopped;
+                    return;
                 }
-                if (++nextEnemyId == 0) nextEnemyId = 1;
-                Spawn(group.Group.enemy, group.Prefab, position, nextEnemyId, group.SubWaveIndex);
-                group.Remaining--;
-                if (group.Replacements > 0) group.Replacements--;
-                group.NextSpawn = now + Mathf.Max(0f, group.Group.spawnInterval);
-                budget--;
+                pending.Add(new PendingGroup { Kind = group.enemy, Prefab = prefab, Remaining = group.count });
             }
         }
-
-        if (stage == WaveStage.SubWaveCountdown) return;
-        stage = WaveStage.Fighting;
-        foreach (var group in pending)
-            if (group.Remaining > 0 && (group.Started || group.Replacements > 0))
-            { stage = WaveStage.Spawning; break; }
-
-        // Track the oldest unfinished sub-wave. Enemies released early keep their
-        // own source index, so they cannot block or duplicate an earlier sub-wave.
-        while (!HasUnfinishedSubWave(subWaveIndex))
-        {
-            if (subWaveIndex + 1 >= GetSubWaveCount())
-            {
-                if (AliveEnemies == 0 && EnemiesWaitingToSpawn == 0) FinishWave(now);
-                return;
-            }
-            subWaveIndex++;
-            if (HasUnspawnedEnemies(subWaveIndex))
-            {
-                stage = WaveStage.SubWaveCountdown;
-                nextWaveAt = now + GetSubWaveDelay();
-                return;
-            }
-        }
-    }
-
-    private bool HasUnspawnedEnemies(int index)
-    {
-        foreach (var group in pending)
-            if (group.SubWaveIndex == index && group.Remaining > 0) return true;
-        return false;
-    }
-
-    private bool HasUnfinishedSubWave(int index)
-    {
-        if (HasUnspawnedEnemies(index)) return true;
-        foreach (var entry in spawned)
-            if (entry.WaveIndex == waveIndex && entry.SubWaveIndex == index &&
-                entry.Enemy != null && entry.Enemy.Health > 0) return true;
-        return false;
-    }
-
-    private void QueueReplacement(SpawnedEnemy defeated)
-    {
-        if (defeated.WaveIndex != waveIndex ||
-            (stage != WaveStage.Spawning && stage != WaveStage.Fighting &&
-             stage != WaveStage.SubWaveCountdown)) return;
-        int nextSubWave = defeated.SubWaveIndex + 1;
-        foreach (var group in pending)
-        {
-            if (group.SubWaveIndex != nextSubWave || group.Group.enemy != defeated.Kind ||
-                group.Remaining <= group.Replacements) continue;
-            group.Replacements++;
-            return;
-        }
-    }
-
-    private int GetSubWaveCount()
-    {
-        if (waves == null || waveIndex < 0 || waveIndex >= waves.Length) return 0;
-        var wave = waves[waveIndex];
-        if (wave?.subWaves != null && wave.subWaves.Length > 0) return wave.subWaves.Length;
-        return wave?.enemies != null && wave.enemies.Length > 0 ? 1 : 0;
-    }
-
-    private SubWave GetSubWave()
-    {
-        var wave = waves[waveIndex];
-        return wave?.subWaves != null && subWaveIndex < wave.subWaves.Length ? wave.subWaves[subWaveIndex] : null;
-    }
-
-    private float GetSubWaveDelay() => Mathf.Max(0f, GetSubWave()?.delayBeforeStart ?? 0f);
-
-    private void BeginWave(float now)
-    {
-        subWaveIndex = 0;
-        if (GetSubWaveCount() == 0) { FinishWave(now); return; }
-        if (!PrepareWave()) return;
-        stage = WaveStage.SubWaveCountdown;
-        nextWaveAt = now + GetSubWaveDelay();
+        stage = WaveStage.Spawning;
     }
 
     private void FinishWave(float now)
@@ -312,48 +247,41 @@ public sealed class WaveDirector : MonoBehaviour
         else
         {
             waveIndex++;
-            subWaveIndex = 0;
             stage = WaveStage.Countdown;
-            nextWaveAt = now + Mathf.Max(0f, waves[waveIndex]?.delayBeforeStart ?? 0f);
+            nextWaveAt = now + Mathf.Max(0f, CurrentDefinition?.delayBeforeStart ?? 0f);
         }
     }
 
-    private bool PrepareWave()
+    private void OnValidate() => MigrateLegacyWaves();
+
+    private void MigrateLegacyWaves()
     {
-        pending.Clear();
-        var wave = waves[waveIndex];
-        for (int index = 0; index < GetSubWaveCount(); index++)
+        if (waves == null) return;
+        foreach (var wave in waves)
         {
-            var groups = wave.subWaves != null && wave.subWaves.Length > 0
-                ? wave.subWaves[index]?.enemies : wave.enemies;
-            if (groups == null) continue;
-            foreach (var group in groups)
-            {
-                if (group == null || group.count <= 0) continue;
-                var prefab = GetPrefab(group.enemy);
-                if (prefab == null)
-                {
-                    Debug.LogError($"Wave {waveIndex + 1}, sub-wave {index + 1}: missing prefab for {group.enemy}. Waves stopped.", this);
-                    pending.Clear();
-                    stage = WaveStage.Stopped;
-                    return false;
-                }
-                pending.Add(new PendingGroup { Group = group, Prefab = prefab,
-                    SubWaveIndex = index, Remaining = group.count, NextSpawn = float.PositiveInfinity });
-            }
-        }
-        return true;
-    }
+            if (wave == null) continue;
+            if (wave.maxConcurrentEnemies <= 0)
+                wave.maxConcurrentEnemies = Mathf.Clamp(legacyConcurrentLimit, 1, MaximumConcurrentEnemies);
+            if (wave.legacySubWaves == null || wave.legacySubWaves.Length == 0) continue;
 
-    private void BeginSubWave(float now)
-    {
-        foreach (var group in pending)
-            if (group.SubWaveIndex == subWaveIndex)
+            var groups = new List<EnemyGroup>();
+            foreach (var sub in wave.legacySubWaves)
             {
-                group.Started = true;
-                group.NextSpawn = now + Mathf.Max(0f, group.Group.delay);
+                if (sub?.enemies == null) continue;
+                foreach (var group in sub.enemies)
+                {
+                    if (group == null || group.count <= 0) continue;
+                    var existing = groups.Find(entry => entry.enemy == group.enemy &&
+                        (long)entry.count + group.count <= int.MaxValue);
+                    if (existing == null)
+                        groups.Add(new EnemyGroup { enemy = group.enemy, count = group.count });
+                    else
+                        existing.count += group.count;
+                }
             }
-        stage = WaveStage.Spawning;
+            wave.enemies = groups.ToArray();
+            wave.legacySubWaves = null;
+        }
     }
 
     internal CombatEnemy GetPrefab(WaveEnemyKind kind)
@@ -363,19 +291,18 @@ public sealed class WaveDirector : MonoBehaviour
         return null;
     }
 
-    private CombatEnemy Spawn(WaveEnemyKind kind, CombatEnemy prefab, Vector3 position, ushort id, int sourceSubWave = -1)
+    private CombatEnemy Spawn(WaveEnemyKind kind, CombatEnemy prefab, Vector3 position, ushort id)
     {
         var heading = player != null ? player.transform.position - position : Vector3.forward;
         heading.y = 0f;
         var enemy = Instantiate(prefab, position, heading.sqrMagnitude > 0.0001f
             ? Quaternion.LookRotation(heading) : Quaternion.identity);
-        int source = sourceSubWave >= 0 ? sourceSubWave : subWaveIndex;
-        enemy.name = $"{kind} - Wave {CurrentWave}.{source + 1} - {id}";
+        enemy.name = $"{kind} - Wave {CurrentWave} - {id}";
         enemy.WaveSpawnId = id;
         enemy.ConfigureForWave(player);
         enemy.gameObject.SetActive(true);
         spawned.Add(new SpawnedEnemy { Id = id, Kind = kind, Enemy = enemy,
-            WaveIndex = waveIndex, SubWaveIndex = source });
+            WaveIndex = waveIndex });
         return enemy;
     }
 
@@ -424,7 +351,6 @@ public sealed class WaveDirector : MonoBehaviour
             var entry = spawned[i];
             if (entry.Enemy == null)
             {
-                if (entry.DiedAt < 0f) QueueReplacement(entry);
                 spawned.RemoveAt(i);
                 continue;
             }
@@ -432,7 +358,6 @@ public sealed class WaveDirector : MonoBehaviour
             if (entry.DiedAt < 0f)
             {
                 entry.DiedAt = now;
-                QueueReplacement(entry);
             }
             if (now < entry.DiedAt + corpseLifetime) continue;
             Destroy(entry.Enemy.gameObject);
@@ -454,14 +379,13 @@ public sealed class WaveDirector : MonoBehaviour
         return prefab != null ? Spawn(kind, prefab, position, id) : null;
     }
 
-    internal void ApplyRemoteWave(WaveStage value, int current, int total, int currentSubWave, int totalSubWaves,
+    internal void ApplyRemoteWave(WaveStage value, int current, int total, int limit,
         int alive, int waiting, int totalEnemies, float countdown, ushort[] manifest)
     {
         stage = value;
         waveIndex = Mathf.Max(0, current - 1);
         remoteTotal = total;
-        subWaveIndex = Mathf.Max(0, currentSubWave - 1);
-        remoteSubWaveTotal = totalSubWaves;
+        remoteLimit = limit;
         remoteAlive = alive;
         remotePending = waiting;
         remoteEnemyTotal = Mathf.Max(0, totalEnemies);
@@ -486,10 +410,8 @@ public sealed class WaveDirector : MonoBehaviour
         if (statusLabel == null) return;
         string status = stage == WaveStage.Complete ? "ALL WAVES CLEARED"
             : stage == WaveStage.Countdown ? $"WAVE {CurrentWave} IN {Mathf.CeilToInt(Countdown)}"
-            : stage == WaveStage.SubWaveCountdown
-                ? $"WAVE {CurrentWave}  |  SUB-WAVE {CurrentSubWave}/{TotalSubWaves} IN {Mathf.CeilToInt(Countdown)}"
             : stage == WaveStage.Spawning || stage == WaveStage.Fighting
-                ? $"WAVE {CurrentWave}  |  SUB-WAVE {CurrentSubWave}/{TotalSubWaves}  |  ENEMIES LEFT: {AliveEnemies + EnemiesWaitingToSpawn}"
+                ? $"WAVE {CurrentWave}  |  ENEMIES LEFT: {RemainingEnemiesInCurrentWave}"
             : IsReplica ? "WAITING FOR HOST" : "";
         if (status != displayedStatus) { displayedStatus = status; statusLabel.text = status; }
     }

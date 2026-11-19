@@ -22,7 +22,7 @@ internal sealed partial class CoopSession : MonoBehaviour
     private const byte SnapshotMessage = 2;
     private const int SnapshotHeaderBytes = 8;
     private const int PlayerBytes = 27;
-    private const int PositionBytes = 47;
+    private const int PositionBytes = 51;
     private const int CombatSnapshotBytes = 118 + 63 + 42;
     private const float RemoteDodgeGrace = 0.15f;
     private const float MeleePacketSlack = 0.10f;
@@ -32,6 +32,10 @@ internal sealed partial class CoopSession : MonoBehaviour
     {
         public byte Id;
         public Vector2 Position;
+        public uint LibraryHazardSequence;
+        public Vector3 LibraryHazardDestination;
+        public float LibraryHazardStarted;
+        public bool LibraryHazardApplied;
         public uint LastSequence;
         public byte Appearance;
         public byte MeleeFlash;
@@ -306,7 +310,10 @@ internal sealed partial class CoopSession : MonoBehaviour
         }
 
         if (IsHost && started)
+        {
+            ApplyPeerLibraryHazards(Time.time);
             ResolvePeerLunges(Time.time);
+        }
         foreach (var avatar in avatars.Values)
             avatar.WhiteFlash.Update();
 
@@ -377,6 +384,7 @@ internal sealed partial class CoopSession : MonoBehaviour
         Vector3 areaOrigin = localMelee != null ? localMelee.AreaAttackOrigin : Vector3.zero;
         WritePosition(ref writer, new Vector2(areaOrigin.x, areaOrigin.z));
         writer.WriteByte(localMeleeSwingAudio);
+        writer.WriteUInt(libraryHazardAcknowledgement);
         driver.EndSend(writer);
     }
 
@@ -399,12 +407,16 @@ internal sealed partial class CoopSession : MonoBehaviour
         uint areaSequence = reader.ReadUInt();
         var areaOrigin = ReadPosition(ref reader);
         byte swingAudio = reader.ReadByte();
+        uint hazardAcknowledgement = reader.ReadUInt();
         if (positionSequence <= peer.LastSequence || !Valid(position) || appearance >= CharacterProfiles.AppearanceCount)
             return;
         peer.LastSequence = positionSequence;
         peer.Appearance = appearance;
         if (started)
         {
+            // Old position packets cannot undo the host's teleport before the client has applied it.
+            if (peer.LibraryHazardSequence != 0 &&
+                (!peer.LibraryHazardApplied || hazardAcknowledgement != peer.LibraryHazardSequence)) return;
             float now = Time.time;
             if (localMovement != null)
             {
@@ -486,6 +498,7 @@ internal sealed partial class CoopSession : MonoBehaviour
             writer.WriteInt(recipient.Value.Health);
             writer.WriteUInt(recipient.Value.DodgeSequence);
             writer.WriteFloat(Mathf.Atan2(recipient.Value.SprintPush.x, recipient.Value.SprintPush.z));
+            WriteLibraryHazard(ref writer, recipient.Value);
             writer.WriteByte(waveDirector != null ? (byte)1 : (byte)0);
             if (waveDirector != null) WriteWaveSnapshot(ref writer);
             else
@@ -509,7 +522,7 @@ internal sealed partial class CoopSession : MonoBehaviour
         bool start = reader.ReadByte() == 1;
         int count = reader.ReadByte();
         if (count < 2 || count > MaxPlayers || assignedId < 2 || assignedId > MaxPlayers ||
-            reader.Length < SnapshotHeaderBytes + count * PlayerBytes + 13 || snapshotSequence <= lastSnapshot)
+            reader.Length < SnapshotHeaderBytes + count * PlayerBytes + 13 + LibraryHazardBytes || snapshotSequence <= lastSnapshot)
             return;
 
         lastSnapshot = snapshotSequence;
@@ -576,6 +589,7 @@ internal sealed partial class CoopSession : MonoBehaviour
             lastSprintHit = sprintHit;
             localMovement?.ApplySprintKnockback(new Vector3(Mathf.Sin(pushAngle), 0f, Mathf.Cos(pushAngle)));
         }
+        if (!ReadLibraryHazard(ref reader)) return;
         byte waveMode = reader.ReadByte();
         if (waveMode == 1) { ReadWaveSnapshot(ref reader); return; }
         if (waveMode != 0 || reader.Length - reader.GetBytesRead() != CombatSnapshotBytes - 12) return;
@@ -1032,6 +1046,7 @@ internal sealed partial class CoopSession : MonoBehaviour
         hosting = busy = started = false;
         Count = localId = 0;
         sequence = lastSnapshot = lastDodge = 0;
+        lastLibraryHazard = libraryHazardAcknowledgement = 0;
         Invite = pendingInvite = null;
         SceneManager.sceneLoaded -= OnGameLoaded;
         peers.Clear();

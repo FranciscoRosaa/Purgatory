@@ -68,7 +68,7 @@ public static class LibraryValidation
                 Check(waves!=null && player!=null && hud!=null && transition!=null,"Scene has player, HUD, director and transition");
                 Check(!transition.EnteredLibrary && LibraryWorld.Active==null,"Library remains inactive during earlier waves");
                 waves.enabled=false;Call(waves,"ClearSpawned");
-                Set(waves,"waveIndex",3);Set(waves,"subWaveIndex",0);Set(waves,"stage",WaveDirector.WaveStage.Countdown);Set(waves,"nextWaveAt",0f);
+                Set(waves,"waveIndex",3);Set(waves,"stage",WaveDirector.WaveStage.Countdown);Set(waves,"nextWaveAt",0f);
                 Call(waves,"Tick",Time.time);
                 step=1;at=EditorApplication.timeSinceStartup+.25;return;
             }
